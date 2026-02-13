@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
+import { withBasePath } from '@/lib/base-path'
 
 interface Notification {
   id: string
@@ -35,7 +36,7 @@ export function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch('/api/notifications?limit=20')
+      const response = await fetch(withBasePath('/api/notifications?limit=20'))
       const data = await response.json()
 
       if (response.ok) {
@@ -80,7 +81,7 @@ export function NotificationBell() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch('/api/notifications', {
+      await fetch(withBasePath('/api/notifications'), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +103,7 @@ export function NotificationBell() {
         notifications
           .filter((n) => !n.read)
           .map((n) =>
-            fetch('/api/notifications', {
+            fetch(withBasePath('/api/notifications'), {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
@@ -123,7 +124,7 @@ export function NotificationBell() {
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id)
     if (notification.task) {
-      router.push(`/tasks/${notification.task.id}`)
+      router.push(withBasePath(`/tasks/${notification.task.id}`))
       setIsOpen(false)
     }
   }

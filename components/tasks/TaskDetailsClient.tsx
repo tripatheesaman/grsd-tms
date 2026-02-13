@@ -15,6 +15,7 @@ import { TaskActions } from './TaskActions'
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 import { FilePreview } from './FilePreview'
 import { TaskEditModal } from './TaskEditModal'
+import { withBasePath } from '@/lib/base-path'
 
 interface TaskDetailsClientProps {
   task: Task & {
@@ -106,7 +107,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
   const handleDelete = async () => {
     setDeleting(true)
     try {
-      const response = await fetch(`/api/tasks/${task.id}`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}`), {
         method: 'DELETE',
       })
 
@@ -119,7 +120,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
       }
 
       toast.success('Task deleted successfully!')
-      router.push('/tasks')
+      router.push(withBasePath('/tasks'))
     } catch (error) {
       toast.error('An error occurred. Please try again.')
       setDeleting(false)
@@ -297,7 +298,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
     <div className="max-w-7xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/tasks"
+          href={withBasePath('/tasks')}
           className="text-blue-600 hover:text-blue-700 text-sm font-medium mb-4 inline-flex items-center gap-1"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -816,7 +817,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                 </div>
                 <Badge variant="info">{task.receive.status}</Badge>
                 <Link
-                  href="/receives"
+                  href={withBasePath('/receives')}
                   className="text-blue-600 text-sm inline-flex items-center gap-1 hover:underline"
                 >
                   Manage Receives

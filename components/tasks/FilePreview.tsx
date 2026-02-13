@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { withBasePath } from '@/lib/base-path'
 
 interface FilePreviewProps {
   attachment: {
@@ -24,7 +25,7 @@ export function FilePreview({ attachment }: FilePreviewProps) {
   const handlePreview = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/files/${attachment.id}`)
+      const response = await fetch(withBasePath(`/api/files/${attachment.id}`))
       if (response.ok) {
         if (isText) {
           const text = await response.text()
@@ -44,7 +45,7 @@ export function FilePreview({ attachment }: FilePreviewProps) {
   }
 
   const handleDownload = () => {
-    window.open(`/api/files/${attachment.id}`, '_blank')
+    window.open(withBasePath(`/api/files/${attachment.id}`), '_blank')
   }
 
   return (

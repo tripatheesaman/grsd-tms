@@ -2,12 +2,13 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { ReportsClient } from '@/components/reports/ReportsClient'
+import { withBasePath } from '@/lib/base-path'
 
 export default async function ReportsPage() {
   const user = await getCurrentUser()
 
   if (!user) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   const userData = await prisma.user.findUnique({
@@ -19,11 +20,11 @@ export default async function ReportsPage() {
   })
 
   if (!userData) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   if (userData.role !== 'SUPERADMIN' && !userData.canViewReports) {
-    redirect('/dashboard')
+    redirect(withBasePath('/dashboard'))
   }
 
   const earliestTask = await prisma.task.findFirst({

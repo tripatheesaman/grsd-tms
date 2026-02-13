@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { LoadingSpinner } from '@/components/ui/Loading'
 import { formatDate, calculateDaysUntilDeadline, stripHtml, truncateText } from '@/lib/utils'
+import { withBasePath } from '@/lib/base-path'
 
 interface Notification {
   id: string
@@ -38,7 +39,7 @@ export function NotificationPanel() {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch('/api/notifications?unreadOnly=true&limit=10')
+      const response = await fetch(withBasePath('/api/notifications?unreadOnly=true&limit=10'))
       const data = await response.json()
 
       if (response.ok) {
@@ -54,7 +55,7 @@ export function NotificationPanel() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch('/api/notifications', {
+      await fetch(withBasePath('/api/notifications'), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -184,7 +185,7 @@ export function NotificationPanel() {
         )}
         {notifications.length > 0 && (
           <Link
-            href="/tasks"
+            href={withBasePath('/tasks')}
             className="block text-center text-sm text-blue-600 hover:text-blue-700 mt-4 font-medium"
           >
             View all tasks →

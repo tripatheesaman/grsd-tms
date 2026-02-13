@@ -14,6 +14,7 @@ import { formatDate } from '@/lib/utils'
 import { UserRole } from '@/types'
 import { ROLE_HIERARCHY } from '@/lib/roles'
 import { UserEditModal } from './UserEditModal'
+import { withBasePath } from '@/lib/base-path'
 
 interface User {
   id: string
@@ -246,7 +247,7 @@ export function UsersClient({
         includeInAllStaff: canToggleAllStaff ? formData.includeInAllStaff : true,
       }
 
-      const response = await fetch('/api/users', {
+      const response = await fetch(withBasePath('/api/users'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -281,7 +282,7 @@ export function UsersClient({
 
     setDeleting(true)
     try {
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch(withBasePath(`/api/users/${userId}`), {
         method: 'DELETE',
       })
 

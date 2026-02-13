@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { withBasePath } from '@/lib/base-path'
 
 interface Personnel {
   id: string
@@ -71,7 +72,7 @@ export function PersonnelClient({
 
     setLoading(true)
     try {
-      const response = await fetch('/api/personnel', {
+      const response = await fetch(withBasePath('/api/personnel'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -104,7 +105,7 @@ export function PersonnelClient({
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/personnel/${editingPersonnel.id}`, {
+      const response = await fetch(withBasePath(`/api/personnel/${editingPersonnel.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -138,7 +139,7 @@ export function PersonnelClient({
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/personnel/${deletingPersonnel.id}`, {
+      const response = await fetch(withBasePath(`/api/personnel/${deletingPersonnel.id}`), {
         method: 'DELETE',
       })
       const data = await response.json()

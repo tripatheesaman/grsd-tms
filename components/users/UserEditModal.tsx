@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
 import { UserRole } from '@/types'
+import { withBasePath } from '@/lib/base-path'
 
 interface User {
   id: string
@@ -171,7 +172,7 @@ export function UserEditModal({
         updateData.password = formData.password
       }
 
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await fetch(withBasePath(`/api/users/${user.id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

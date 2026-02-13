@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
 import { LoadingSpinner } from '@/components/ui/Loading'
+import { withBasePath } from '@/lib/base-path'
 
 type ReportType = 'receive-only' | 'assign-only' | 'receive-and-assign'
 type ExportFormat = 'csv' | 'excel' | 'pdf'
@@ -38,7 +39,7 @@ export function ReportsClient({
         ...(endDate && { endDate }),
       })
 
-      const response = await fetch(`/api/reports?${params.toString()}`)
+      const response = await fetch(withBasePath(`/api/reports?${params.toString()}`))
       if (!response.ok) {
         throw new Error('Failed to fetch report data')
       }
@@ -69,7 +70,7 @@ export function ReportsClient({
         ...(endDate && { endDate }),
       })
 
-      const response = await fetch(`/api/reports/export?${params.toString()}`)
+      const response = await fetch(withBasePath(`/api/reports/export?${params.toString()}`))
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Export failed')
@@ -131,7 +132,7 @@ export function ReportsClient({
         <div className="flex items-center gap-4">
           <div className="relative w-16 h-16">
             <Image
-              src="/nac_icon.png"
+              src={withBasePath('/nac_icon.png')}
               alt="NAC Logo"
               fill
               className="object-contain"

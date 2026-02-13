@@ -2,11 +2,12 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { TaskList } from '@/components/dashboard/TaskList'
+import { withBasePath } from '@/lib/base-path'
 
 export default async function DueTasksPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   const tasks = await prisma.task.findMany({

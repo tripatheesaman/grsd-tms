@@ -9,6 +9,7 @@ import { RichTextEditor } from '@/components/forms/RichTextEditor'
 import { UserSelector } from '@/components/forms/UserSelector'
 import { useToast } from '@/components/ui/Toast'
 import { Task, TaskStatus } from '@/types'
+import { withBasePath } from '@/lib/base-path'
 
 interface User {
   id: string
@@ -49,7 +50,7 @@ export function TaskEditModal({ isOpen, onClose, task, onSuccess }: TaskEditModa
   useEffect(() => {
     const fetchPriorities = async () => {
       try {
-        const response = await fetch('/api/priorities')
+        const response = await fetch(withBasePath('/api/priorities'))
         if (response.ok) {
           const data = await response.json()
           if (data.priorities) {
@@ -62,7 +63,7 @@ export function TaskEditModal({ isOpen, onClose, task, onSuccess }: TaskEditModa
     }
     const fetchComplexities = async () => {
       try {
-        const response = await fetch('/api/complexities')
+        const response = await fetch(withBasePath('/api/complexities'))
         if (response.ok) {
           const data = await response.json()
           if (data.complexities) {
@@ -75,7 +76,7 @@ export function TaskEditModal({ isOpen, onClose, task, onSuccess }: TaskEditModa
     }
     const fetchPersonnel = async () => {
       try {
-        const response = await fetch('/api/personnel')
+        const response = await fetch(withBasePath('/api/personnel'))
         if (response.ok) {
           const data = await response.json()
           if (data.personnel) {
@@ -88,7 +89,7 @@ export function TaskEditModal({ isOpen, onClose, task, onSuccess }: TaskEditModa
     }
     const fetchWorkcenters = async () => {
       try {
-        const response = await fetch('/api/workcenters')
+        const response = await fetch(withBasePath('/api/workcenters'))
         if (response.ok) {
           const data = await response.json()
           if (data.workcenters) {
@@ -141,7 +142,7 @@ export function TaskEditModal({ isOpen, onClose, task, onSuccess }: TaskEditModa
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/tasks/${task.id}`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

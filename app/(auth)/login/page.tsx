@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { withBasePath } from '@/lib/base-path'
 
 const fieldStyles =
   'w-full rounded-2xl border border-white/20 bg-white/5 px-5 py-3 text-sm text-white placeholder-white/70 focus:border-white/60 focus:outline-none focus:ring-2 focus:ring-white/60'
@@ -20,7 +21,7 @@ function LoginForm() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(withBasePath('/api/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -37,13 +38,13 @@ function LoginForm() {
       }
 
       if (data.user?.mustChangePassword) {
-        router.push('/change-password')
+        router.push(withBasePath('/change-password'))
         router.refresh()
         return
       }
 
       const redirect = searchParams.get('redirect') || '/dashboard'
-      router.push(redirect)
+      router.push(withBasePath(redirect))
       router.refresh()
     } catch (err) {
       setError('An error occurred. Please try again.')
@@ -137,7 +138,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-center lg:justify-start">
             <div className="relative flex w-full max-w-sm items-center gap-4 rounded-[28px] border border-white/20 bg-white/10 p-4 backdrop-blur">
               <div className="relative h-16 w-16 rounded-2xl bg-white shadow-lg shadow-black/20 ring-4 ring-white/30">
-                <img src="/logo.png" alt="Nepal Airlines" className="h-full w-full object-contain p-2" />
+                <img src={withBasePath('/logo.png')} alt="Nepal Airlines" className="h-full w-full object-contain p-2" />
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold uppercase tracking-[0.4em] text-white/60">

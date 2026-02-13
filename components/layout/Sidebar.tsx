@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { UserRole } from '@/types'
+import { withBasePath } from '@/lib/base-path'
 
 interface NavItem {
   name: string
@@ -183,6 +184,11 @@ export function Sidebar({
   completionRequestCount = 0,
 }: SidebarProps) {
   const pathname = usePathname()
+  const basePath = withBasePath('/')
+  const normalizedPathname =
+    basePath !== '/' && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length) || '/'
+      : pathname
 
   const filteredNav = navigation.filter((item) => {
     
@@ -238,7 +244,7 @@ export function Sidebar({
         <div className="px-5 py-6 border-b border-white/20 flex items-center gap-3">
           <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-white ring-2 ring-white/70 shrink-0">
             <Image
-              src="/logo.png"
+              src={withBasePath('/logo.png')}
               alt="Nepal Airlines"
               fill
               className="object-contain p-2"
@@ -261,13 +267,13 @@ export function Sidebar({
           {filteredNav.map((item) => {
             const isActive =
               item.href === '/tasks'
-                ? pathname === item.href || pathname.startsWith('/tasks/')
-                : pathname === item.href
+                ? normalizedPathname === item.href || normalizedPathname.startsWith('/tasks/')
+                : normalizedPathname === item.href
 
             return (
               <Link
                 key={item.name}
-                href={item.href}
+                href={withBasePath(item.href)}
                 className={cn(
                   'group flex items-center px-3 py-2 text-sm font-semibold rounded-xl transition-all',
                   isActive

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { LoadingSpinner } from '@/components/ui/Loading'
 import { formatDate, calculateDaysUntilDeadline, stripHtml, truncateText } from '@/lib/utils'
 import { Task, TaskStatus, UserRole } from '@/types'
+import { withBasePath } from '@/lib/base-path'
 
 export default function TasksPage() {
   const getTaskPreview = (task: Task, isNotice: boolean, length = 200) => {
@@ -56,7 +57,7 @@ export default function TasksPage() {
     let isMounted = true
     const checkPermission = async () => {
       try {
-        const response = await fetch('/api/auth/me')
+        const response = await fetch(withBasePath('/api/auth/me'))
         if (!response.ok) {
           throw new Error('Failed to load user info')
         }
@@ -133,7 +134,7 @@ export default function TasksPage() {
         params.append('createdDateTo', createdDateTo)
       }
 
-      const response = await fetch(`/api/tasks?${params.toString()}`)
+      const response = await fetch(withBasePath(`/api/tasks?${params.toString()}`))
       const data = await response.json()
 
       if (response.ok) {
@@ -239,7 +240,7 @@ export default function TasksPage() {
           )}
         </div>
         <Button
-          onClick={() => router.push('/tasks/new')}
+          onClick={() => router.push(withBasePath('/tasks/new'))}
           disabled={!canCreateTasks}
           variant={canCreateTasks ? 'primary' : 'outline'}
         >
@@ -417,7 +418,7 @@ export default function TasksPage() {
               : 0
             const isNotice = task.isNotice
             return (
-              <Link key={task.id} href={`/tasks/${task.id}`}>
+              <Link key={task.id} href={withBasePath(`/tasks/${task.id}`)}>
                 <Card className={`hover:shadow-md transition-shadow cursor-pointer ${
                   isNotice 
                     ? 'border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50' 

@@ -3,6 +3,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
+import { withBasePath } from '@/lib/base-path'
 
 interface DatabaseClientProps {
   stats: {
@@ -18,7 +19,7 @@ export function DatabaseClient({ stats }: DatabaseClientProps) {
 
   const handleExport = async (type: string) => {
     try {
-      const response = await fetch(`/api/database/export?type=${type}`)
+      const response = await fetch(withBasePath(`/api/database/export?type=${type}`))
       if (!response.ok) {
         throw new Error('Export failed')
       }

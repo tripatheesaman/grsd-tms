@@ -2,6 +2,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { logger } from './logger'
+import { withBasePath } from './base-path'
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './public/uploads'
 const MAX_FILE_SIZE = 10 * 1024 * 1024 
@@ -111,9 +112,14 @@ export async function deleteFile(filepath: string): Promise<boolean> {
 }
 
 export function getFileUrl(filepath: string): string {
-  
-  const relativePath = filepath.replace(/\\/g, '/').replace(/^.*\/public\
-  return relativePath
+  const normalizedPath = filepath.replace(/\\/g, '/')
+  const uploadMarker = '/uploads/'
+  const markerIndex = normalizedPath.lastIndexOf(uploadMarker)
+  if (markerIndex === -1) {
+    return withBasePath('/uploads')
+  }
+  const uploadPath = normalizedPath.slice(markerIndex)
+  return withBasePath(uploadPath)
 }
 
 export function validateFile(file: File): { valid: boolean; error?: string } {

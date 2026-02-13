@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
+import { withBasePath } from '@/lib/base-path'
 
 export default function ChangePasswordPage() {
   const router = useRouter()
@@ -21,20 +22,20 @@ export default function ChangePasswordPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me')
+        const response = await fetch(withBasePath('/api/auth/me'))
         if (!response.ok) {
-          router.push('/login')
+          router.push(withBasePath('/login'))
           return
         }
         const data = await response.json()
         
         if (data.user && !data.user.mustChangePassword) {
-          router.push('/dashboard')
+          router.push(withBasePath('/dashboard'))
           return
         }
         setCheckingAuth(false)
       } catch (err) {
-        router.push('/login')
+        router.push(withBasePath('/login'))
       }
     }
     checkAuth()
@@ -79,7 +80,7 @@ export default function ChangePasswordPage() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/change-password', {
+      const response = await fetch(withBasePath('/api/auth/change-password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +100,7 @@ export default function ChangePasswordPage() {
       }
 
       toast.success('Password changed successfully!')
-      router.push('/dashboard')
+      router.push(withBasePath('/dashboard'))
       router.refresh()
     } catch (err) {
       setError('An error occurred. Please try again.')

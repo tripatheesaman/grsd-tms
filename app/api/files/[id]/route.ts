@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
-import { join } from 'path'
 import { logger } from '@/lib/logger'
+import { getFileUrl } from '@/lib/storage'
 
 export async function GET(
   request: NextRequest,
@@ -53,18 +52,8 @@ export async function GET(
     }
 
     
-    const fileBuffer = await readFile(attachment.filepath)
-
-    
-    const contentType =
-      attachment.mimeType || 'application/octet-stream'
-
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${attachment.filename}"`,
-      },
-    })
+    const fileUrl = getFileUrl(attachment.filepath)
+    return NextResponse.redirect(new URL(fileUrl, request.url))
   } catch (error) {
     logger.error('Error downloading file', error)
     return NextResponse.json(

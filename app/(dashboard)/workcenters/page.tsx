@@ -3,11 +3,12 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { UserRole } from '@/types'
 import { WorkcentersClient } from '@/components/workcenters/WorkcentersClient'
+import { withBasePath } from '@/lib/base-path'
 
 export default async function WorkcentersPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   const currentUserData = await prisma.user.findUnique({
@@ -19,7 +20,7 @@ export default async function WorkcentersPage() {
     !currentUserData ||
     (currentUserData.role !== 'SUPERADMIN' && !currentUserData.canManageWorkcenters)
   ) {
-    redirect('/dashboard')
+    redirect(withBasePath('/dashboard'))
   }
 
   const workcenters = await prisma.workcenter.findMany({

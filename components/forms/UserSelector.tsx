@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/Input'
+import { withBasePath } from '@/lib/base-path'
 
 interface User {
   id: string
@@ -64,7 +65,7 @@ export function UserSelector({
         lowerInput.includes('all staff')
 
       try {
-        const response = await fetch(`/api/users/search?q=${encodeURIComponent(inputValue)}`)
+        const response = await fetch(withBasePath(`/api/users/search?q=${encodeURIComponent(inputValue)}`))
         if (response.ok) {
           const data = await response.json()
           const filtered = data.users.filter(

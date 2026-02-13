@@ -12,6 +12,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Modal } from '@/components/ui/Modal'
 import { Receive, ReceiveStatus, TaskStatus } from '@/types'
 import { formatDate, formatDateTime } from '@/lib/utils'
+import { withBasePath } from '@/lib/base-path'
 
 interface ReceiveWithMeta extends Receive {
   createdBy?: {
@@ -58,7 +59,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
 
     setLoading(true)
     try {
-      const response = await fetch('/api/receives', {
+      const response = await fetch(withBasePath('/api/receives'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,7 +91,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
     if (!closingReceive) return
 
     try {
-      const response = await fetch(`/api/receives/${closingReceive.id}`, {
+      const response = await fetch(withBasePath(`/api/receives/${closingReceive.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CLOSED' satisfies ReceiveStatus }),
@@ -180,7 +181,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                             {receive.tasks.map((task) => (
                               <Link
                                 key={task.id}
-                                href={`/tasks/${task.id}`}
+                                href={withBasePath(`/tasks/${task.id}`)}
                                 className="text-blue-600 hover:underline block"
                               >
                                 {task.recordNumber} ({task.status.replace('_', ' ')})
@@ -194,7 +195,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                       <td className="px-4 py-3">
                         {canManage ? (
                           <div className="flex justify-end gap-2">
-                            <Link href={`/tasks/new?receiveId=${receive.id}`}>
+                            <Link href={withBasePath(`/tasks/new?receiveId=${receive.id}`)}>
                               <Button size="sm">
                                 Assign
                               </Button>

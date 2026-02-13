@@ -4,11 +4,12 @@ import { getCurrentUser } from '@/lib/auth'
 import { formatDate, formatDateTime, stripHtml, truncateText } from '@/lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { withBasePath } from '@/lib/base-path'
 
 export default async function CompletionRequestsPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   const currentUser = await prisma.user.findUnique({
@@ -24,7 +25,7 @@ export default async function CompletionRequestsPage() {
     (currentUser.role === 'SUPERADMIN' || currentUser.canApproveCompletions)
 
   if (!canReviewCompletions) {
-    redirect('/dashboard')
+    redirect(withBasePath('/dashboard'))
   }
 
   const completionTasks = await prisma.task.findMany({
@@ -119,7 +120,7 @@ export default async function CompletionRequestsPage() {
                     </div>
                   </div>
                   <a
-                    href={`/tasks/${task.id}`}
+                    href={withBasePath(`/tasks/${task.id}`)}
                     className="text-sm font-semibold text-[var(--brand-blue)] hover:underline"
                   >
                     Review task →

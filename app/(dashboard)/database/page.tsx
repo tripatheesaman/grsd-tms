@@ -2,11 +2,12 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { DatabaseClient } from '@/components/database/DatabaseClient'
+import { withBasePath } from '@/lib/base-path'
 
 export default async function DatabasePage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   const currentUserData = await prisma.user.findUnique({
@@ -15,7 +16,7 @@ export default async function DatabasePage() {
   })
 
   if (currentUserData?.role !== 'SUPERADMIN') {
-    redirect('/dashboard')
+    redirect(withBasePath('/dashboard'))
   }
 
   

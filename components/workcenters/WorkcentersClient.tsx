@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 import { formatDate } from '@/lib/utils'
+import { withBasePath } from '@/lib/base-path'
 
 interface Workcenter {
   id: string
@@ -100,7 +101,7 @@ export function WorkcentersClient({ workcenters: initialWorkcenters }: Workcente
     if (!deleteTarget) return
     setSaving(true)
     try {
-      const response = await fetch(`/api/workcenters/${deleteTarget.id}`, {
+      const response = await fetch(withBasePath(`/api/workcenters/${deleteTarget.id}`), {
         method: 'DELETE',
       })
 

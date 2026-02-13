@@ -2,11 +2,12 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { ReceivesClient } from '@/components/receives/ReceivesClient'
+import { withBasePath } from '@/lib/base-path'
 
 export default async function ReceivesPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   const currentUser = await prisma.user.findUnique({
@@ -23,7 +24,7 @@ export default async function ReceivesPage() {
     !currentUser ||
     (currentUser.role !== 'SUPERADMIN' && !currentUser.canManageReceives)
   ) {
-    redirect('/dashboard')
+    redirect(withBasePath('/dashboard'))
   }
 
   const receives = await prisma.receive.findMany({

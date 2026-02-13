@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
 import { canCloseTask, canRevertTask, canEditTask, canAcknowledgeTask } from '@/lib/roles'
 import { Task, UserRole } from '@/types'
+import { withBasePath } from '@/lib/base-path'
 
 interface TaskActionsProps {
   task: Task & {
@@ -75,7 +76,7 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
         formData.append('file', selectedFile)
       }
 
-      const response = await fetch(`/api/tasks/${task.id}/actions`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
         method: 'POST',
         body: formData,
       })
@@ -123,7 +124,7 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
         formData.append('file', selectedFile)
       }
 
-      const response = await fetch(`/api/tasks/${task.id}/actions`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
         method: 'POST',
         body: formData,
       })
@@ -167,7 +168,7 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
         formData.append('file', selectedFile)
       }
 
-      const response = await fetch(`/api/tasks/${task.id}/actions`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
         method: 'POST',
         body: formData,
       })
@@ -193,7 +194,7 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
   const handleRevert = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/tasks/${task.id}/actions`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,7 +223,7 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
   const handleAcknowledge = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/tasks/${task.id}/actions`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,7 +257,7 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/tasks/${task.id}/actions`, {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

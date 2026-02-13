@@ -11,6 +11,7 @@ import { UserSelector } from '@/components/forms/UserSelector'
 import { FileUpload } from '@/components/forms/FileUpload'
 import { useToast } from '@/components/ui/Toast'
 import { LoadingSpinner } from '@/components/ui/Loading'
+import { withBasePath } from '@/lib/base-path'
 
 interface User {
   id: string
@@ -57,7 +58,7 @@ export default function NewTaskPage() {
     let isMounted = true
     const checkPermission = async () => {
       try {
-        const response = await fetch('/api/auth/me')
+        const response = await fetch(withBasePath('/api/auth/me'))
         if (!response.ok) {
           throw new Error('Failed to load user info')
         }
@@ -76,7 +77,7 @@ export default function NewTaskPage() {
 
     const fetchPriorities = async () => {
       try {
-        const response = await fetch('/api/priorities')
+        const response = await fetch(withBasePath('/api/priorities'))
         if (response.ok) {
           const data = await response.json()
           if (isMounted && data.priorities) {
@@ -94,7 +95,7 @@ export default function NewTaskPage() {
 
     const fetchComplexities = async () => {
       try {
-        const response = await fetch('/api/complexities')
+        const response = await fetch(withBasePath('/api/complexities'))
         if (response.ok) {
           const data = await response.json()
           if (isMounted && data.complexities) {
@@ -112,7 +113,7 @@ export default function NewTaskPage() {
 
     const fetchPersonnel = async () => {
       try {
-        const response = await fetch('/api/personnel')
+        const response = await fetch(withBasePath('/api/personnel'))
         if (response.ok) {
           const data = await response.json()
           if (isMounted && data.personnel) {
@@ -126,7 +127,7 @@ export default function NewTaskPage() {
 
     const fetchWorkcenters = async () => {
       try {
-        const response = await fetch('/api/workcenters')
+        const response = await fetch(withBasePath('/api/workcenters'))
         if (response.ok) {
           const data = await response.json()
           if (isMounted && data.workcenters) {
@@ -158,7 +159,7 @@ export default function NewTaskPage() {
       setReceiveLoading(true)
       setReceiveError(null)
       try {
-        const response = await fetch(`/api/receives/${receiveId}`)
+        const response = await fetch(withBasePath(`/api/receives/${receiveId}`))
         const data = await response.json()
         if (!response.ok) {
           setReceiveError(data.error || 'Unable to load receive details')
@@ -198,7 +199,7 @@ export default function NewTaskPage() {
     const fetchUserWorkcenters = async () => {
       try {
         const userIds = internalUsers.map((u) => u.id)
-        const response = await fetch('/api/users/batch', {
+        const response = await fetch(withBasePath('/api/users/batch'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -342,7 +343,7 @@ export default function NewTaskPage() {
         formDataToSend.append('receiveId', linkedReceive.id)
       }
 
-      const response = await fetch('/api/tasks', {
+      const response = await fetch(withBasePath('/api/tasks'), {
         method: 'POST',
         body: formDataToSend,
       })
@@ -356,7 +357,7 @@ export default function NewTaskPage() {
       }
 
       toast.success('Task created successfully!')
-      router.push(`/tasks/${data.task.id}`)
+      router.push(withBasePath(`/tasks/${data.task.id}`))
     } catch (error) {
       toast.error('An error occurred. Please try again.')
       setLoading(false)
@@ -382,7 +383,7 @@ export default function NewTaskPage() {
             <p className="text-gray-600">
               You do not have permission to create tasks. Please contact a superadmin if you believe this is a mistake.
             </p>
-            <Button variant="outline" onClick={() => router.push('/tasks')}>
+            <Button variant="outline" onClick={() => router.push(withBasePath('/tasks'))}>
               Back to Tasks
             </Button>
           </CardContent>

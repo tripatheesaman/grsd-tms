@@ -8,11 +8,12 @@ import {
   getAssignableRoles,
 } from '@/lib/roles'
 import type { UserRole } from '@/types'
+import { withBasePath } from '@/lib/base-path'
 
 export default async function UsersPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect('/login')
+    redirect(withBasePath('/login'))
   }
 
   const currentUserData = await prisma.user.findUnique({
@@ -24,7 +25,7 @@ export default async function UsersPage() {
     !currentUserData ||
     !canManageUsers(currentUserData.role as UserRole)
   ) {
-    redirect('/dashboard')
+    redirect(withBasePath('/dashboard'))
   }
 
   const visibleRoles = getVisibleRoles(currentUserData.role as UserRole)

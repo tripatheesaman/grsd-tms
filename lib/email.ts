@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { logger } from './logger'
+import { joinBaseUrl } from './base-path'
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.nac.com.np',
@@ -17,7 +18,7 @@ const transporter = nodemailer.createTransport({
 
 const getLogoUrl = () => {
   const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-  return `${baseUrl}/logo.png`
+  return joinBaseUrl(baseUrl, '/logo.png')
 }
 
 interface EmailTemplateOptions {
@@ -107,8 +108,8 @@ export async function sendTaskNotificationEmail(
   try {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
     const taskUrl = taskData.taskId
-      ? `${baseUrl}/tasks/${taskData.taskId}`
-      : `${baseUrl}/tasks/${taskData.recordNumber}`
+      ? joinBaseUrl(baseUrl, `/tasks/${taskData.taskId}`)
+      : joinBaseUrl(baseUrl, `/tasks/${taskData.recordNumber}`)
 
     const dueDate = new Date(taskData.assignedCompletionDate)
     const dueDateText = dueDate.toLocaleString('en-US', {
@@ -219,8 +220,8 @@ export async function sendTaskForwardEmail(
   try {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
     const taskUrl = taskData.taskId
-      ? `${baseUrl}/tasks/${taskData.taskId}`
-      : `${baseUrl}/tasks/${taskData.recordNumber}`
+      ? joinBaseUrl(baseUrl, `/tasks/${taskData.taskId}`)
+      : joinBaseUrl(baseUrl, `/tasks/${taskData.recordNumber}`)
 
     const dueDate = new Date(taskData.assignedCompletionDate)
     const dueDateText = dueDate.toLocaleString('en-US', {
@@ -318,7 +319,7 @@ export async function sendTaskRejectionEmail(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const taskUrl = `${baseUrl}/tasks/${taskData.taskId}`
+    const taskUrl = joinBaseUrl(baseUrl, `/tasks/${taskData.taskId}`)
 
     const dueDate = new Date(taskData.assignedCompletionDate)
     const dueDateText = dueDate.toLocaleString('en-US', {
@@ -392,7 +393,7 @@ export async function sendNoticeEmail(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const noticeUrl = `${baseUrl}/tasks/${noticeData.taskId}`
+    const noticeUrl = joinBaseUrl(baseUrl, `/tasks/${noticeData.taskId}`)
 
     const bodySections = [
       `<p>Hello,</p>`,
@@ -466,8 +467,8 @@ export async function sendUserCredentialsEmail(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const loginUrl = `${baseUrl}/login`
-    const changePasswordUrl = `${baseUrl}/change-password`
+    const loginUrl = joinBaseUrl(baseUrl, '/login')
+    const changePasswordUrl = joinBaseUrl(baseUrl, '/change-password')
 
     const body = [
       `<p>Hello ${data.name || data.email},</p>`,

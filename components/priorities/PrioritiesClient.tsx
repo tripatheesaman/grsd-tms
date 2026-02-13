@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { withBasePath } from '@/lib/base-path'
 
 interface Priority {
   id: string
@@ -71,7 +72,7 @@ export function PrioritiesClient({
 
     setLoading(true)
     try {
-      const response = await fetch('/api/priorities', {
+      const response = await fetch(withBasePath('/api/priorities'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -104,7 +105,7 @@ export function PrioritiesClient({
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/priorities/${editingPriority.id}`, {
+      const response = await fetch(withBasePath(`/api/priorities/${editingPriority.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -138,7 +139,7 @@ export function PrioritiesClient({
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/priorities/${deletingPriority.id}`, {
+      const response = await fetch(withBasePath(`/api/priorities/${deletingPriority.id}`), {
         method: 'DELETE',
       })
       const data = await response.json()
