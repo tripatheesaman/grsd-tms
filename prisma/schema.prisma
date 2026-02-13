@@ -1,0 +1,326 @@
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPERADMIN
+  DIRECTOR
+  DY_DIRECTOR
+  MANAGER
+  INCHARGE
+  EMPLOYEE
+}
+
+enum TaskStatus {
+  ACTIVE
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+}
+
+
+
+enum TaskActionType {
+  CREATED
+  ASSIGNED
+  FORWARDED
+  SUBMITTED
+  CLOSED
+  REVERTED
+  EDITED
+  ACKNOWLEDGED
+  REJECTED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_FORWARDED
+  TASK_CLOSED
+  TASK_UPDATED
+}
+
+enum ReceiveStatus {
+  OPEN
+  ASSIGNED
+  CLOSED
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password          String
+  name              String
+  role              UserRole  @default(EMPLOYEE)
+  mustChangePassword Boolean  @default(true)
+  canCreateTasks    Boolean   @default(false)
+  canManageComplexities Boolean @default(false)
+  canManagePersonnel Boolean @default(false)
+  canManageWorkcenters Boolean @default(false)
+  canManagePriorities Boolean @default(false)
+  canManageUsers Boolean @default(false)
+  canManageReceives Boolean @default(false)
+  canApproveCompletions Boolean @default(false)
+  canRevertCompletions Boolean @default(false)
+  canViewReports Boolean @default(false)
+  includeInAllStaff Boolean   @default(true)
+  designation       String
+  staffId           String    @unique
+  workcenterId      String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  
+  createdTasks      Task[]                @relation("TaskCreator")
+  assignedTasks     Task[]                @relation("TaskAssignee")
+  acknowledgedTasks Task[]                @relation("TaskAcknowledger")
+  taskAssignments   TaskAssignment[]
+  taskActions       TaskAction[]          @relation("TaskActionPerformedBy")
+  taskActionsForwarded TaskAction[]       @relation("TaskActionForwardedTo")
+  taskHistory       TaskHistory[]
+  notifications     Notification[]
+  uploadedFiles     TaskAttachment[]
+  workcenter        Workcenter            @relation(fields: [workcenterId], references: [id])
+  createdReceives   Receive[]             @relation("ReceiveCreatedBy")
+  closedReceives    Receive[]             @relation("ReceiveClosedBy")
+
+  @@index([email])
+  @@index([role])
+  @@index([workcenterId])
+}
+
+model Task {
+  id                      String            @id @default(uuid())
+  recordNumber            String            @unique
+  issuanceDate            DateTime          @default(now())
+  issuanceMessage         String?           @db.Text
+  descriptionOfWork       String            @db.Text
+  assignedToId            String?
+  externalAssigneeName    String?
+  externalAssigneeEmail   String?
+  receiveId               String?
+  priorityId              String
+  complexityId            String
+  assignedPersonnelId     String?
+  workcenterId            String?
+  status                  TaskStatus        @default(ACTIVE)
+  assignedCompletionDate  DateTime
+  lastDeadlineReminder    DateTime?
+  acknowledgedById        String?
+  acknowledgedAt          DateTime?
+  createdById             String
+  isNotice                Boolean           @default(false)
+  noticeGroupId           String?           
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  
+  createdBy               User              @relation("TaskCreator", fields: [createdById], references: [id])
+  assignedTo              User?             @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  acknowledgedBy          User?             @relation("TaskAcknowledger", fields: [acknowledgedById], references: [id])
+  receive                 Receive?          @relation(fields: [receiveId], references: [id])
+  priority                Priority          @relation(fields: [priorityId], references: [id])
+  complexity              Complexity        @relation(fields: [complexityId], references: [id])
+  assignedPersonnel       AssignedPersonnel? @relation(fields: [assignedPersonnelId], references: [id])
+  workcenter              Workcenter?       @relation(fields: [workcenterId], references: [id])
+  assignments             TaskAssignment[]
+  attachments             TaskAttachment[]
+  actions                 TaskAction[]
+  history                 TaskHistory[]
+  notifications           Notification[]
+
+  @@index([recordNumber])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([createdById])
+  @@index([assignedCompletionDate])
+  @@index([isNotice])
+  @@index([noticeGroupId])
+  @@index([receiveId])
+  @@index([priorityId])
+  @@index([complexityId])
+  @@index([assignedPersonnelId])
+  @@index([workcenterId])
+  @@unique([receiveId])
+}
+
+model TaskAttachment {
+  id            String   @id @default(uuid())
+  taskId        String
+  filename      String
+  filepath      String
+  fileSize      Int?
+  mimeType      String?
+  uploadedById  String
+  createdAt     DateTime @default(now())
+
+  
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@index([uploadedById])
+}
+
+model TaskAction {
+  id                String          @id @default(uuid())
+  taskId            String
+  actionType        TaskActionType
+  description       String?         @db.Text
+  performedById     String
+  forwardedToId     String?
+  forwardedToEmail  String?
+  referenceNumber   String?
+  createdAt         DateTime        @default(now())
+
+  
+  task              Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  performedBy       User            @relation("TaskActionPerformedBy", fields: [performedById], references: [id])
+  forwardedTo       User?           @relation("TaskActionForwardedTo", fields: [forwardedToId], references: [id])
+
+  @@index([taskId])
+  @@index([performedById])
+  @@index([createdAt])
+}
+
+model TaskHistory {
+  id          String   @id @default(uuid())
+  taskId      String
+  action      String
+  oldValue    String?  @db.Text
+  newValue    String?  @db.Text
+  changedById String
+  createdAt   DateTime @default(now())
+
+  
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  changedBy   User     @relation(fields: [changedById], references: [id])
+
+  @@index([taskId])
+  @@index([changedById])
+  @@index([createdAt])
+}
+
+model Notification {
+  id               String           @id @default(uuid())
+  userId           String
+  taskId           String?
+  type             NotificationType
+  message          String           @db.Text
+  read             Boolean          @default(false)
+  lastReminderSent DateTime?
+  createdAt        DateTime         @default(now())
+
+  
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task             Task?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model TaskAssignment {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model Workcenter {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  tasks       Task[]
+}
+
+model Receive {
+  id                  String         @id @default(uuid())
+  referenceNumber     String         @unique
+  letterReferenceNumber String?      
+  receivedFrom        String
+  subject             String
+  receivedDate        DateTime       @default(now())
+  status              ReceiveStatus  @default(OPEN)
+  createdById         String
+  closedById          String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  closedAt            DateTime?
+
+  createdBy           User           @relation("ReceiveCreatedBy", fields: [createdById], references: [id])
+  closedBy            User?          @relation("ReceiveClosedBy", fields: [closedById], references: [id])
+  tasks               Task[]
+
+  @@index([status])
+  @@index([createdById])
+  @@index([closedById])
+}
+
+model SequenceCounter {
+  name      String   @id
+  value     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Complexity {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  order       Int      @unique 
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks       Task[]
+
+  @@index([order])
+  @@index([name])
+}
+
+model AssignedPersonnel {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  order       Int      @unique 
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks       Task[]
+
+  @@index([order])
+  @@index([name])
+}
+
+model Priority {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  order       Int      @unique 
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks       Task[]
+
+  @@index([order])
+  @@index([name])
+}

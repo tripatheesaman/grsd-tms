@@ -1,0 +1,40 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: grsd-tms-db
+    env_file:
+      - ./.env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - /srv/grsd-tms/db:/var/lib/mysql
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    image: tripatheesaman/grsd-tms:latest
+    container_name: grsd-tms-app
+    env_file:
+      - ./config/.env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /srv/grsd-tms/uploads:/app/public/uploads
+      - /srv/grsd-tms/logs:/app/logs
+    ports:
+      - "127.0.0.1:3004:3000"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+networks:
+  tms_network:
+    driver: bridge
