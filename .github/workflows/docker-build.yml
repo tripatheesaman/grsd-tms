@@ -28,3 +28,5 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: tripatheesaman/grsd-tms:latest
+          build-args: |
+            NEXT_PUBLIC_BASE_PATH=${{ vars.NEXT_PUBLIC_BASE_PATH || '/tms' }}
