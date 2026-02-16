@@ -181,7 +181,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                             {receive.tasks.map((task) => (
                               <Link
                                 key={task.id}
-                                href={withBasePath(`/tasks/${task.id}`)}
+                                href={`/tasks/${task.id}`}
                                 className="text-blue-600 hover:underline block"
                               >
                                 {task.recordNumber} ({task.status.replace('_', ' ')})
@@ -195,7 +195,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                       <td className="px-4 py-3">
                         {canManage ? (
                           <div className="flex justify-end gap-2">
-                            <Link href={withBasePath(`/tasks/new?receiveId=${receive.id}`)}>
+                            <Link href={`/tasks/new?receiveId=${receive.id}`}>
                               <Button size="sm">
                                 Assign
                               </Button>

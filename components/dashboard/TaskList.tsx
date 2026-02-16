@@ -6,7 +6,6 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, calculateDaysUntilDeadline, stripHtml, truncateText } from '@/lib/utils'
 import { Task, TaskStatus } from '@/types'
-import { withBasePath } from '@/lib/base-path'
 
 interface TaskListProps {
   tasks: Task[]
@@ -101,7 +100,7 @@ export function TaskList({ tasks, title, emptyMessage = 'No tasks found' }: Task
 
             const isNotice = task.isNotice
             return (
-              <Link key={task.id} href={withBasePath(`/tasks/${task.id}`)}>
+              <Link key={task.id} href={`/tasks/${task.id}`}>
                 <div
                   className={`p-4 rounded-lg border-2 transition-all hover:shadow-md cursor-pointer ${
                     isNotice

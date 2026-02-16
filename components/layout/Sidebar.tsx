@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { UserRole } from '@/types'
-import { withBasePath } from '@/lib/base-path'
+import { getBasePath } from '@/lib/base-path'
 
 interface NavItem {
   name: string
@@ -184,9 +184,9 @@ export function Sidebar({
   completionRequestCount = 0,
 }: SidebarProps) {
   const pathname = usePathname()
-  const basePath = withBasePath('/')
+  const basePath = getBasePath()
   const normalizedPathname =
-    basePath !== '/' && pathname.startsWith(basePath)
+    basePath && pathname.startsWith(basePath)
       ? pathname.slice(basePath.length) || '/'
       : pathname
 
@@ -240,11 +240,11 @@ export function Sidebar({
 
   return (
     <div className="hidden md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-30">
-      <div className="flex-1 flex flex-col bg-gradient-to-b from-[var(--brand-blue)] via-[#001437] to-[var(--brand-red)] text-white shadow-2xl">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-gradient-to-b from-[var(--brand-blue)] via-[#001437] to-[var(--brand-red)] text-white shadow-2xl">
         <div className="px-5 py-6 border-b border-white/20 flex items-center gap-3">
           <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-white ring-2 ring-white/70 shrink-0">
             <Image
-              src={withBasePath('/logo.png')}
+              src="/logo.png"
               alt="Nepal Airlines"
               fill
               className="object-contain p-2"
@@ -263,7 +263,7 @@ export function Sidebar({
           </div>
         </div>
 
-        <nav className="flex-1 px-4 py-5 space-y-1 overflow-y-auto">
+        <nav className="flex-1 min-h-0 px-4 py-5 space-y-1 overflow-y-auto">
           {filteredNav.map((item) => {
             const isActive =
               item.href === '/tasks'
@@ -273,7 +273,7 @@ export function Sidebar({
             return (
               <Link
                 key={item.name}
-                href={withBasePath(item.href)}
+                href={item.href}
                 className={cn(
                   'group flex items-center px-3 py-2 text-sm font-semibold rounded-xl transition-all',
                   isActive
