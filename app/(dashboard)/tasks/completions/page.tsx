@@ -4,7 +4,6 @@ import { getCurrentUser } from '@/lib/auth'
 import { formatDate, formatDateTime, stripHtml, truncateText } from '@/lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { withBasePath } from '@/lib/base-path'
 
 export default async function CompletionRequestsPage() {
   const user = await getCurrentUser()
@@ -120,7 +119,7 @@ export default async function CompletionRequestsPage() {
                     </div>
                   </div>
                   <a
-                    href={withBasePath(`/tasks/${task.id}`)}
+                    href={`/tasks/${task.id}`}
                     className="text-sm font-semibold text-[var(--brand-blue)] hover:underline"
                   >
                     Review task →
