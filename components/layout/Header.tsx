@@ -21,7 +21,7 @@ export function Header({ userName, userEmail, userRole }: HeaderProps) {
   const handleLogout = async () => {
     try {
       await fetch(withBasePath('/api/auth/logout'), { method: 'POST' })
-      router.push(withBasePath('/login'))
+      router.push('/login')
       router.refresh()
     } catch (error) {
       console.error('Logout error:', error)

@@ -120,7 +120,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
       }
 
       toast.success('Task deleted successfully!')
-      router.push(withBasePath('/tasks'))
+      router.push('/tasks')
     } catch (error) {
       toast.error('An error occurred. Please try again.')
       setDeleting(false)

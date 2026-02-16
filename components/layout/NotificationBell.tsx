@@ -124,7 +124,7 @@ export function NotificationBell() {
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id)
     if (notification.task) {
-      router.push(withBasePath(`/tasks/${notification.task.id}`))
+      router.push(`/tasks/${notification.task.id}`)
       setIsOpen(false)
     }
   }

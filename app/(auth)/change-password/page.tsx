@@ -24,18 +24,18 @@ export default function ChangePasswordPage() {
       try {
         const response = await fetch(withBasePath('/api/auth/me'))
         if (!response.ok) {
-          router.push(withBasePath('/login'))
+          router.push('/login')
           return
         }
         const data = await response.json()
         
         if (data.user && !data.user.mustChangePassword) {
-          router.push(withBasePath('/dashboard'))
+          router.push('/dashboard')
           return
         }
         setCheckingAuth(false)
       } catch (err) {
-        router.push(withBasePath('/login'))
+        router.push('/login')
       }
     }
     checkAuth()
@@ -100,7 +100,7 @@ export default function ChangePasswordPage() {
       }
 
       toast.success('Password changed successfully!')
-      router.push(withBasePath('/dashboard'))
+      router.push('/dashboard')
       router.refresh()
     } catch (err) {
       setError('An error occurred. Please try again.')
