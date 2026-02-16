@@ -418,7 +418,7 @@ export default function TasksPage() {
               : 0
             const isNotice = task.isNotice
             return (
-              <Link key={task.id} href={withBasePath(`/tasks/${task.id}`)}>
+              <Link key={task.id} href={`/tasks/${task.id}`}>
                 <Card className={`hover:shadow-md transition-shadow cursor-pointer ${
                   isNotice 
                     ? 'border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50' 

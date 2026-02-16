@@ -185,7 +185,7 @@ export function NotificationPanel() {
         )}
         {notifications.length > 0 && (
           <Link
-            href={withBasePath('/tasks')}
+            href="/tasks"
             className="block text-center text-sm text-blue-600 hover:text-blue-700 mt-4 font-medium"
           >
             View all tasks →

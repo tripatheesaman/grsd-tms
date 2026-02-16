@@ -67,7 +67,7 @@ export function Header({ userName, userEmail, userRole }: HeaderProps) {
         <div className="flex items-center gap-3">
           <div className="relative w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white/80 shadow-lg shadow-blue-900/20">
             <Image
-              src={withBasePath('/logo.png')}
+              src="/logo.png"
               alt="Nepal Airlines"
               fill
               className="object-contain p-1"
@@ -137,7 +137,7 @@ export function Header({ userName, userEmail, userRole }: HeaderProps) {
                   </div>
                   <div className="p-3 space-y-2">
                     <Link
-                      href={withBasePath('/change-password')}
+                      href="/change-password"
                       className="flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
                       onClick={() => setIsMenuOpen(false)}
                     >

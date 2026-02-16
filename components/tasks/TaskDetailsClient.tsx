@@ -298,7 +298,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
     <div className="max-w-7xl mx-auto">
       <div className="mb-6">
         <Link
-          href={withBasePath('/tasks')}
+          href="/tasks"
           className="text-blue-600 hover:text-blue-700 text-sm font-medium mb-4 inline-flex items-center gap-1"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -817,7 +817,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                 </div>
                 <Badge variant="info">{task.receive.status}</Badge>
                 <Link
-                  href={withBasePath('/receives')}
+                  href="/receives"
                   className="text-blue-600 text-sm inline-flex items-center gap-1 hover:underline"
                 >
                   Manage Receives
