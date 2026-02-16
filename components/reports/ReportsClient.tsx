@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
 import { LoadingSpinner } from '@/components/ui/Loading'
-import { withBasePath } from '@/lib/base-path'
 
 type ReportType = 'receive-only' | 'assign-only' | 'receive-and-assign'
 type ExportFormat = 'csv' | 'excel' | 'pdf'
@@ -132,7 +131,7 @@ export function ReportsClient({
         <div className="flex items-center gap-4">
           <div className="relative w-16 h-16">
             <Image
-              src={withBasePath('/nac_icon.png')}
+            src="/nac_icon.png"
               alt="NAC Logo"
               fill
               className="object-contain"
