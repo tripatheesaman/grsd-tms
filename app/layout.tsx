@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { withBasePath } from "@/lib/base-path";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,9 +20,9 @@ export const metadata: Metadata = {
   description:
     "Ground Support Department's receive and dispatch logging system for Nepal Airlines.",
   icons: {
-    icon: "/nac_icon.png",
-    shortcut: "/nac_icon.png",
-    apple: "/nac_icon.png",
+    icon: withBasePath("/nac_icon.png"),
+    shortcut: withBasePath("/nac_icon.png"),
+    apple: withBasePath("/nac_icon.png"),
   },
 };
 

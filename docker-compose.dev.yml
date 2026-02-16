@@ -28,7 +28,7 @@ services:
     environment:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
-      NEXT_BUILD: ${NEXT_BUILD:-1}
+      NEXT_BUILD: ${NEXT_BUILD:-0}
       NEXT_PUBLIC_TIMEZONE: ${NEXT_PUBLIC_TIMEZONE:-UTC}
     depends_on:
       db:
