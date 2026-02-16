@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db'
 import { calculateDaysUntilDeadline, formatDate, stripHtml, truncateText } from '@/lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { UserRole } from '@/types'
+import { withBasePath } from '@/lib/base-path'
 
 interface LeadershipData {
   watchlist: Array<{
@@ -460,7 +461,7 @@ export default async function DashboardPage() {
             <p className="text-white/80 max-w-2xl">{heroMessage}</p>
           </div>
           {canCreateTasks && (
-            <Link href="/tasks/new">
+            <Link href={withBasePath('/tasks/new')}>
               <Button variant="secondary" size="lg">
                 Create task
               </Button>
@@ -511,7 +512,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 <Link
-                  href="/tasks?sortBy=deadline"
+                  href={withBasePath('/tasks?sortBy=deadline')}
                   className="text-sm font-semibold text-[var(--brand-blue)]"
                 >
                   View all →
@@ -560,7 +561,7 @@ export default async function DashboardPage() {
                               : `${task.daysLeft}d remaining`}
                           </p>
                           <Link
-                            href={`/tasks/${task.id}`}
+                            href={withBasePath(`/tasks/${task.id}`)}
                             className="text-xs text-[var(--brand-blue)] font-semibold inline-block mt-2"
                           >
                             Open →
@@ -663,7 +664,7 @@ export default async function DashboardPage() {
                         </p>
                       </div>
                       <Link
-                        href={`/tasks/${task.id}`}
+                        href={withBasePath(`/tasks/${task.id}`)}
                         className="text-xs font-semibold text-[var(--brand-blue)]"
                       >
                         Review →
@@ -694,21 +695,21 @@ export default async function DashboardPage() {
             <CardContent className="space-y-4 text-sm">
               <div className="space-y-2">
                 <Link
-                  href="/tasks?assignedTo=me"
+                  href={withBasePath('/tasks?assignedTo=me')}
                   className="flex items-center justify-between hover:text-[var(--brand-blue)]"
                 >
                   <span>View all my tasks</span>
                   <span className="text-xs text-slate-500">→</span>
                 </Link>
                 <Link
-                  href="/tasks/due"
+                  href={withBasePath('/tasks/due')}
                   className="flex items-center justify-between hover:text-[var(--brand-blue)]"
                 >
                   <span>Due soon board</span>
                   <span className="text-xs text-slate-500">→</span>
                 </Link>
                 <Link
-                  href="/receives"
+                  href={withBasePath('/receives')}
                   className="flex items-center justify-between hover:text-[var(--brand-blue)]"
                 >
                   <span>Incoming receives</span>
@@ -727,7 +728,7 @@ export default async function DashboardPage() {
                     return (
                       <Link
                         key={task.id}
-                        href={`/tasks/${task.id}`}
+                        href={withBasePath(`/tasks/${task.id}`)}
                         className="block border border-slate-100 rounded-lg px-3 py-2 hover:border-[var(--brand-blue)]"
                       >
                         <p className="font-semibold text-slate-900">{task.recordNumber}</p>
