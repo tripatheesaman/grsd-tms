@@ -3,7 +3,6 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
-import { withBasePath } from '@/lib/base-path'
 
 export default async function DashboardLayout({
   children,
@@ -13,7 +12,7 @@ export default async function DashboardLayout({
   const user = await getCurrentUser()
 
   if (!user) {
-    redirect(withBasePath('/login'))
+    redirect('/login')
   }
 
   const userData = await prisma.user.findUnique({
@@ -38,12 +37,12 @@ export default async function DashboardLayout({
     })
 
   if (!userData) {
-    redirect(withBasePath('/login'))
+    redirect('/login')
   }
 
   
   if (userData.mustChangePassword) {
-    redirect(withBasePath('/change-password'))
+    redirect('/change-password')
   }
 
   const [dueTaskCount, completionRequestCount] = await Promise.all([

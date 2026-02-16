@@ -3,12 +3,11 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { PrioritiesClient } from '@/components/priorities/PrioritiesClient'
 import { UserRole } from '@/types'
-import { withBasePath } from '@/lib/base-path'
 
 export default async function PrioritiesPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect(withBasePath('/login'))
+    redirect('/login')
   }
 
   const currentUserData = await prisma.user.findUnique({
@@ -20,7 +19,7 @@ export default async function PrioritiesPage() {
     !currentUserData ||
     (currentUserData.role !== 'SUPERADMIN' && !currentUserData.canManagePriorities)
   ) {
-    redirect(withBasePath('/dashboard'))
+    redirect('/dashboard')
   }
 
   const priorities = await prisma.priority.findMany({

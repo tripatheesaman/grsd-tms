@@ -3,12 +3,11 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { PersonnelClient } from '@/components/personnel/PersonnelClient'
 import { UserRole } from '@/types'
-import { withBasePath } from '@/lib/base-path'
 
 export default async function PersonnelPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect(withBasePath('/login'))
+    redirect('/login')
   }
 
   const currentUserData = await prisma.user.findUnique({
@@ -20,7 +19,7 @@ export default async function PersonnelPage() {
     !currentUserData ||
     (currentUserData.role !== 'SUPERADMIN' && !currentUserData.canManagePersonnel)
   ) {
-    redirect(withBasePath('/dashboard'))
+    redirect('/dashboard')
   }
 
   const personnel = await prisma.assignedPersonnel.findMany({
