@@ -357,7 +357,7 @@ export default function NewTaskPage() {
       }
 
       toast.success('Task created successfully!')
-      router.push(withBasePath(`/tasks/${data.task.id}`))
+      router.push(`/tasks/${data.task.id}`)
     } catch (error) {
       toast.error('An error occurred. Please try again.')
       setLoading(false)
@@ -383,7 +383,7 @@ export default function NewTaskPage() {
             <p className="text-gray-600">
               You do not have permission to create tasks. Please contact a superadmin if you believe this is a mistake.
             </p>
-            <Button variant="outline" onClick={() => router.push(withBasePath('/tasks'))}>
+            <Button variant="outline" onClick={() => router.push('/tasks')}>
               Back to Tasks
             </Button>
           </CardContent>

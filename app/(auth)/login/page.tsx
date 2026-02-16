@@ -38,13 +38,13 @@ function LoginForm() {
       }
 
       if (data.user?.mustChangePassword) {
-        router.push(withBasePath('/change-password'))
+        router.push('/change-password')
         router.refresh()
         return
       }
 
       const redirect = searchParams.get('redirect') || '/dashboard'
-      router.push(withBasePath(redirect))
+      router.push(redirect)
       router.refresh()
     } catch (err) {
       setError('An error occurred. Please try again.')

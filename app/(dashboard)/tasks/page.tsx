@@ -240,7 +240,7 @@ export default function TasksPage() {
           )}
         </div>
         <Button
-          onClick={() => router.push(withBasePath('/tasks/new'))}
+          onClick={() => router.push('/tasks/new')}
           disabled={!canCreateTasks}
           variant={canCreateTasks ? 'primary' : 'outline'}
         >
