@@ -1,0 +1,48 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: grsd-tms-db-dev
+    env_file:
+      - ./.env.development
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tms}
+    ports:
+      - "3308:3306"
+    volumes:
+      - tms_dev_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: grsd-tms-app-dev
+    env_file:
+      - ./.env.development
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      NEXT_BUILD: ${NEXT_BUILD:-0}
+      NEXT_PUBLIC_TIMEZONE: ${NEXT_PUBLIC_TIMEZONE:-UTC}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - tms_dev_node_modules:/app/node_modules
+      - tms_dev_next:/app/.next
+      - ./public/uploads:/app/public/uploads
+    restart: unless-stopped
+
+volumes:
+  tms_dev_db_data:
+  tms_dev_node_modules:
+  tms_dev_next:

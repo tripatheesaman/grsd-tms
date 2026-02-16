@@ -53,7 +53,15 @@ export async function GET(
 
     
     const fileUrl = getFileUrl(attachment.filepath)
-    return NextResponse.redirect(new URL(fileUrl, request.url))
+    const forwardedProto = request.headers.get('x-forwarded-proto')
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const hostHeader = forwardedHost || request.headers.get('host') || 'localhost:3000'
+    const normalizedHost = hostHeader
+      .replace(/^0\.0\.0\.0(?=[:/]|$)/, 'localhost')
+      .replace(/^\[::\](?=[:/]|$)/, 'localhost')
+    const protocol = forwardedProto || request.nextUrl.protocol.replace(':', '')
+    const redirectBase = `${protocol}://${normalizedHost}`
+    return NextResponse.redirect(new URL(fileUrl, redirectBase))
   } catch (error) {
     logger.error('Error downloading file', error)
     return NextResponse.json(
