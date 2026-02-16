@@ -7,4 +7,4 @@ RUN apk add --no-cache libc6-compat openssl python3 make g++
 COPY package.json package-lock.json* ./
 RUN npm install
 
-CMD ["sh", "-c", "npx prisma generate && npx prisma db push && if [ \"${TEST_BUILD:-0}\" = \"1\" ]; then npm run build; fi && npm run dev -- --hostname 0.0.0.0 --port 3000"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma db push && if [ \"${NEXT_BUILD:-0}\" = \"1\" ]; then npm run build; fi && npm run dev -- --hostname 0.0.0.0 --port 3000"]
