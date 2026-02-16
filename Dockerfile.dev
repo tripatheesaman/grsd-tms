@@ -7,4 +7,4 @@ RUN apk add --no-cache libc6-compat openssl python3 make g++
 COPY package.json package-lock.json* ./
 RUN npm install
 
-CMD ["sh", "-c", "npx prisma generate && npx prisma db push && if [ \"${NEXT_BUILD:-0}\" = \"1\" ]; then npm run build; fi && npm run dev -- --hostname 0.0.0.0 --port 3000"]
+CMD ["sh", "-c", "echo \"NEXT_BUILD=$NEXT_BUILD\" && npx prisma generate && npx prisma db push && if [ \"$NEXT_BUILD\" = \"1\" ]; then echo \"Running next build (NEXT_BUILD=1)\"; if ! npm run build; then echo \"next build failed (continuing to dev)\"; fi; echo \"Running TypeScript typecheck\"; if ! npm run typecheck; then echo \"typecheck failed (continuing to dev)\"; fi; else echo \"Skipping build/typecheck (NEXT_BUILD!=1)\"; fi && npm run dev -- --hostname 0.0.0.0 --port 3000"]

@@ -12,6 +12,7 @@
     "dev:docker:down": "npm run dev:env && docker compose --env-file .env.development -f docker-compose.dev.yml down",
     "dev:docker:logs": "npm run dev:env && docker compose --env-file .env.development -f docker-compose.dev.yml logs -f",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "npx prisma generate",
