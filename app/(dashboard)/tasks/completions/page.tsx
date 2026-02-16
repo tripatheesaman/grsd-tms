@@ -9,7 +9,7 @@ import { withBasePath } from '@/lib/base-path'
 export default async function CompletionRequestsPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect(withBasePath('/login'))
+    redirect('/login')
   }
 
   const currentUser = await prisma.user.findUnique({
@@ -25,7 +25,7 @@ export default async function CompletionRequestsPage() {
     (currentUser.role === 'SUPERADMIN' || currentUser.canApproveCompletions)
 
   if (!canReviewCompletions) {
-    redirect(withBasePath('/dashboard'))
+    redirect('/dashboard')
   }
 
   const completionTasks = await prisma.task.findMany({

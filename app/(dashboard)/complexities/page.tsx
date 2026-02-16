@@ -3,12 +3,11 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { ComplexitiesClient } from '@/components/complexities/ComplexitiesClient'
 import { UserRole } from '@/types'
-import { withBasePath } from '@/lib/base-path'
 
 export default async function ComplexitiesPage() {
   const user = await getCurrentUser()
   if (!user) {
-    redirect(withBasePath('/login'))
+    redirect('/login')
   }
 
   const currentUserData = await prisma.user.findUnique({
@@ -20,7 +19,7 @@ export default async function ComplexitiesPage() {
     !currentUserData ||
     (currentUserData.role !== 'SUPERADMIN' && !currentUserData.canManageComplexities)
   ) {
-    redirect(withBasePath('/dashboard'))
+    redirect('/dashboard')
   }
 
   const complexities = await prisma.complexity.findMany({
