@@ -73,6 +73,7 @@ export function Header({ userName, userEmail, userRole }: HeaderProps) {
               className="object-contain p-1"
               sizes="48px"
               priority
+              unoptimized
             />
           </div>
           <div>
