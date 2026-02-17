@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { UserRole } from '@/types'
-import { getBasePath } from '@/lib/base-path'
+import { getBasePath, withBasePath } from '@/lib/base-path'
 
 interface NavItem {
   name: string
@@ -244,7 +244,7 @@ export function Sidebar({
         <div className="px-5 py-6 border-b border-white/20 flex items-center gap-3">
           <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-white ring-2 ring-white/70 shrink-0">
             <Image
-              src="/logo.png"
+              src={withBasePath("/logo.png")}
               alt="Nepal Airlines"
               fill
               className="object-contain p-2"
