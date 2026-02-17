@@ -250,6 +250,7 @@ export function Sidebar({
               className="object-contain p-2"
               sizes="56px"
               priority
+              unoptimized
             />
           </div>
           <div className="space-y-1">

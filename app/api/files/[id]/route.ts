@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { existsSync } from 'fs'
+import { readFile } from 'fs/promises'
 import { logger } from '@/lib/logger'
-import { getFileUrl } from '@/lib/storage'
 
 export async function GET(
   request: NextRequest,
@@ -52,16 +52,20 @@ export async function GET(
     }
 
     
-    const fileUrl = getFileUrl(attachment.filepath)
-    const forwardedProto = request.headers.get('x-forwarded-proto')
-    const forwardedHost = request.headers.get('x-forwarded-host')
-    const hostHeader = forwardedHost || request.headers.get('host') || 'localhost:3000'
-    const normalizedHost = hostHeader
-      .replace(/^0\.0\.0\.0(?=[:/]|$)/, 'localhost')
-      .replace(/^\[::\](?=[:/]|$)/, 'localhost')
-    const protocol = forwardedProto || request.nextUrl.protocol.replace(':', '')
-    const redirectBase = `${protocol}://${normalizedHost}`
-    return NextResponse.redirect(new URL(fileUrl, redirectBase))
+    const buffer = await readFile(attachment.filepath)
+    const mimeType = attachment.mimeType || 'application/octet-stream'
+    const disposition = `${
+      mimeType === 'application/pdf' || mimeType.startsWith('image/')
+        ? 'inline'
+        : 'attachment'
+    }; filename="${encodeURIComponent(attachment.filename)}"`
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': mimeType,
+        'Content-Disposition': disposition,
+      },
+    })
   } catch (error) {
     logger.error('Error downloading file', error)
     return NextResponse.json(
