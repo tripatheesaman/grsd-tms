@@ -47,6 +47,13 @@ enum NotificationType {
   TASK_UPDATED
 }
 
+enum TaskSubmissionStatus {
+  PENDING
+  SUBMITTED
+  ACKNOWLEDGED
+  REJECTED
+}
+
 enum ReceiveStatus {
   OPEN
   ASSIGNED
@@ -66,7 +73,9 @@ model User {
   canManageWorkcenters Boolean @default(false)
   canManagePriorities Boolean @default(false)
   canManageUsers Boolean @default(false)
+  canManageSettings Boolean @default(false)
   canManageReceives Boolean @default(false)
+  canViewAllSubmissions Boolean @default(false)
   canApproveCompletions Boolean @default(false)
   canRevertCompletions Boolean @default(false)
   canViewReports Boolean @default(false)
@@ -85,6 +94,9 @@ model User {
   taskActions       TaskAction[]          @relation("TaskActionPerformedBy")
   taskActionsForwarded TaskAction[]       @relation("TaskActionForwardedTo")
   taskHistory       TaskHistory[]
+  taskSubmissions   TaskSubmission[]      @relation("TaskSubmissionUser")
+  acknowledgedSubmissions TaskSubmission[] @relation("TaskSubmissionAcknowledgedBy")
+  rejectedSubmissions TaskSubmission[]    @relation("TaskSubmissionRejectedBy")
   notifications     Notification[]
   uploadedFiles     TaskAttachment[]
   workcenter        Workcenter            @relation(fields: [workcenterId], references: [id])
@@ -99,6 +111,7 @@ model User {
 model Task {
   id                      String            @id @default(uuid())
   recordNumber            String            @unique
+  fileNumber              String?
   issuanceDate            DateTime          @default(now())
   issuanceMessage         String?           @db.Text
   descriptionOfWork       String            @db.Text
@@ -131,12 +144,14 @@ model Task {
   assignedPersonnel       AssignedPersonnel? @relation(fields: [assignedPersonnelId], references: [id])
   workcenter              Workcenter?       @relation(fields: [workcenterId], references: [id])
   assignments             TaskAssignment[]
+  submissions             TaskSubmission[]
   attachments             TaskAttachment[]
   actions                 TaskAction[]
   history                 TaskHistory[]
   notifications           Notification[]
 
   @@index([recordNumber])
+  @@index([fileNumber])
   @@index([assignedToId])
   @@index([status])
   @@index([createdById])
@@ -242,6 +257,36 @@ model TaskAssignment {
   @@index([userId])
 }
 
+model TaskSubmission {
+  id                  String               @id @default(uuid())
+  taskId               String
+  userId               String
+  status               TaskSubmissionStatus @default(PENDING)
+  submissionDescription String?             @db.Text
+  attachmentFilename   String?
+  attachmentFilepath   String?
+  attachmentMimeType   String?
+  attachmentSize       Int?
+  submittedAt          DateTime?
+  acknowledgedAt       DateTime?
+  acknowledgedById     String?
+  rejectedAt           DateTime?
+  rejectedById         String?
+  rejectionReason      String?              @db.Text
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  task                 Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user                 User                 @relation("TaskSubmissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  acknowledgedBy       User?                @relation("TaskSubmissionAcknowledgedBy", fields: [acknowledgedById], references: [id])
+  rejectedBy           User?                @relation("TaskSubmissionRejectedBy", fields: [rejectedById], references: [id])
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+  @@index([status])
+}
+
 model Workcenter {
   id          String   @id @default(uuid())
   name        String   @unique
@@ -281,6 +326,21 @@ model SequenceCounter {
   value     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AppConfig {
+  id                  String   @id @default("default")
+  currentFy           String
+  dispatchStartNumber Int      @default(1)
+  receiveStartNumber  Int      @default(1)
+  smtpHost            String?
+  smtpPort            Int?
+  smtpSecure          Boolean  @default(false)
+  smtpUser            String?
+  smtpPassEncrypted   String?  @db.Text
+  smtpFrom            String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Complexity {

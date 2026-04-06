@@ -8,6 +8,7 @@ interface User {
   id: string
   email: string
   name: string
+  designation?: string
 }
 
 interface UserSelectorProps {
@@ -46,6 +47,7 @@ export function UserSelector({
       id: ALL_STAFF_TOKEN,
       email: 'allstaff@nac.com.np',
       name: 'ALL STAFF',
+      designation: 'All staff members',
     })
   }
 
@@ -79,6 +81,7 @@ export function UserSelector({
               id: ALL_STAFF_TOKEN,
               email: 'allstaff@nac.com.np',
               name: 'ALL STAFF',
+              designation: 'All staff members',
             })
           }
           
@@ -220,7 +223,7 @@ export function UserSelector({
             onFocus={() => setShowSuggestions(suggestions.length > 0)}
             placeholder={
               selectedUsers.length === 0
-                ? 'Type email or name (use commas to separate)...'
+                ? 'Type email, name, or designation (use commas to separate)...'
                 : ''
             }
             className="flex-1 min-w-[120px] outline-none bg-transparent"
@@ -247,6 +250,7 @@ export function UserSelector({
                 </div>
                 <div className={`text-sm ${isAllStaff ? 'text-blue-700' : 'text-gray-500'}`}>
                   {user.email}
+                  {!isAllStaff && user.designation ? ` • ${user.designation}` : ''}
                   {isAllStaff && <span className="ml-2 text-xs text-blue-600">(All staff members)</span>}
                 </div>
               </button>

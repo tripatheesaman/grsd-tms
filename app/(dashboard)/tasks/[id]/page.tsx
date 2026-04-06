@@ -31,6 +31,20 @@ export default async function TaskDetailsPage({
           },
         },
       },
+      submissions: {
+        include: {
+          user: {
+            select: { id: true, name: true, email: true },
+          },
+          acknowledgedBy: {
+            select: { id: true, name: true, email: true },
+          },
+          rejectedBy: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+      },
       acknowledgedBy: {
         select: { id: true, name: true, email: true },
       },
@@ -97,6 +111,7 @@ export default async function TaskDetailsPage({
       canCreateTasks: true,
       canApproveCompletions: true,
       canRevertCompletions: true,
+      canViewAllSubmissions: true,
     },
   })
 
@@ -107,7 +122,9 @@ export default async function TaskDetailsPage({
   const canViewAll =
     currentUser.role === 'SUPERADMIN' ||
     currentUser.role === 'DIRECTOR' ||
-    task.assignedToId === currentUser.id
+    currentUser.canViewAllSubmissions === true ||
+    task.assignedToId === currentUser.id ||
+    task.assignments.some((assignment: any) => assignment.userId === currentUser.id)
 
   let filteredTask = task
 
@@ -157,7 +174,9 @@ export default async function TaskDetailsPage({
         : [],
       actions: visibleUntil
         ? task.actions.filter(
-            (action: any) => action.createdAt <= visibleUntil
+            (action: any) =>
+              action.createdAt <= visibleUntil &&
+              (action.performedById === userId || action.forwardedToId === userId)
           )
         : [],
       history: visibleUntil
@@ -168,6 +187,9 @@ export default async function TaskDetailsPage({
             (assignment: any) => assignment.createdAt <= visibleUntil
           )
         : [],
+      submissions: task.submissions.filter(
+        (submission: any) => submission.userId === userId
+      ),
     }
   }
 

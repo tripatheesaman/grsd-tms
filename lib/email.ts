@@ -1,19 +1,25 @@
 import nodemailer from 'nodemailer'
 import { logger } from './logger'
 import { joinBaseUrl } from './base-path'
+import { getSmtpRuntimeConfig } from './system-config'
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'mail.nac.com.np',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_PORT === '465', 
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false, 
-  },
-})
+async function createTransporter() {
+  const config = await getSmtpRuntimeConfig()
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user
+      ? {
+          user: config.user,
+          pass: config.pass,
+        }
+      : undefined,
+    tls: {
+      rejectUnauthorized: false,
+    },
+  })
+}
 
 
 const getLogoUrl = () => {
@@ -178,13 +184,15 @@ export async function sendTaskNotificationEmail(
       buttonUrl: taskUrl,
     })
 
+    const smtp = await getSmtpRuntimeConfig()
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: smtp.from,
       to,
       subject: `New Task Assigned: ${taskData.recordNumber}`,
       html: html,
     }
 
+    const transporter = await createTransporter()
     const result = await transporter.sendMail(mailOptions)
     logger.info('Email sent successfully', {
       messageId: result.messageId,
@@ -278,13 +286,15 @@ export async function sendTaskForwardEmail(
       buttonUrl: taskUrl,
     })
 
+    const smtp = await getSmtpRuntimeConfig()
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: smtp.from,
       to,
       subject: `Task Forwarded: ${taskData.recordNumber}`,
       html,
     }
 
+    const transporter = await createTransporter()
     const result = await transporter.sendMail(mailOptions)
     logger.info('Forward email sent successfully', {
       messageId: result.messageId,
@@ -355,13 +365,15 @@ export async function sendTaskRejectionEmail(
       buttonUrl: taskUrl,
     })
 
+    const smtp = await getSmtpRuntimeConfig()
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: smtp.from,
       to,
       subject: `Task Rejected: ${taskData.recordNumber}`,
       html,
     }
 
+    const transporter = await createTransporter()
     const result = await transporter.sendMail(mailOptions)
     logger.info('Rejection email sent successfully', {
       messageId: result.messageId,
@@ -430,13 +442,15 @@ export async function sendNoticeEmail(
       buttonUrl: noticeUrl,
     })
 
+    const smtp = await getSmtpRuntimeConfig()
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: smtp.from,
       to,
       subject: `Notice: ${noticeData.recordNumber}`,
       html,
     }
 
+    const transporter = await createTransporter()
     const result = await transporter.sendMail(mailOptions)
     logger.info('Notice email sent successfully', {
       messageId: result.messageId,
@@ -492,13 +506,15 @@ export async function sendUserCredentialsEmail(
       buttonUrl: loginUrl,
     })
 
+    const smtp = await getSmtpRuntimeConfig()
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: smtp.from,
       to,
       subject: `Welcome to TMS! Your Account Details`,
       html,
     }
 
+    const transporter = await createTransporter()
     const result = await transporter.sendMail(mailOptions)
     logger.info('User credentials email sent successfully', {
       messageId: result.messageId,
@@ -517,6 +533,7 @@ export async function sendUserCredentialsEmail(
 
 export async function testSMTPConnection(): Promise<{ success: boolean; error?: string }> {
   try {
+    const transporter = await createTransporter()
     await transporter.verify()
     logger.info('SMTP connection verified successfully')
     return { success: true }

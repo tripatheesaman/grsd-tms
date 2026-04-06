@@ -151,7 +151,7 @@ export default function LoginPage() {
           </div>
           <div className="space-y-4">
             <h1 className="text-4xl font-semibold leading-tight text-white md:text-5xl">
-              Nepal Airlines Ground Support Department
+              Nepal Airlines Corporation, Ground Support Department
             </h1>
             <p className="mx-auto max-w-xl text-base text-white/85 lg:mx-0">
               Receive &amp; dispatch logging for GrSD. Manage assignments,

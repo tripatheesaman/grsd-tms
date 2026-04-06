@@ -35,6 +35,8 @@ interface User {
   canManageWorkcenters?: boolean
   canManagePriorities?: boolean
   canManageUsers?: boolean
+  canManageSettings?: boolean
+  canViewAllSubmissions?: boolean
   canManageReceives?: boolean
   canApproveCompletions?: boolean
   canRevertCompletions?: boolean
@@ -86,6 +88,8 @@ export function UsersClient({
     canManageWorkcenters: false,
     canManagePriorities: false,
     canManageUsers: false,
+    canManageSettings: false,
+    canViewAllSubmissions: false,
     canManageReceives: false,
     canApproveCompletions: false,
     canRevertCompletions: false,
@@ -131,7 +135,9 @@ export function UsersClient({
   const canToggleWorkcenterManagement = currentUserRole === 'SUPERADMIN'
   const canTogglePriorityManagement = currentUserRole === 'SUPERADMIN'
   const canToggleUserManagement = currentUserRole === 'SUPERADMIN'
+  const canToggleSettingsManagement = currentUserRole === 'SUPERADMIN'
   const canToggleCompletionApproval = currentUserRole === 'SUPERADMIN'
+  const canToggleViewAllSubmissions = currentUserRole === 'SUPERADMIN'
   const canToggleReceiveManagement = currentUserRole === 'SUPERADMIN'
   const canToggleCompletionRevert = currentUserRole === 'SUPERADMIN'
   const canToggleReportAccess = currentUserRole === 'SUPERADMIN'
@@ -143,6 +149,8 @@ export function UsersClient({
     | 'canManageWorkcenters'
     | 'canManagePriorities'
     | 'canManageUsers'
+    | 'canManageSettings'
+    | 'canViewAllSubmissions'
     | 'canManageReceives'
     | 'canApproveCompletions'
     | 'canRevertCompletions'
@@ -183,6 +191,18 @@ export function UsersClient({
       label: 'Manage users',
       description: 'Access user management module.',
       enabled: canToggleUserManagement,
+    },
+    {
+      key: 'canManageSettings',
+      label: 'Manage system settings',
+      description: 'Configure SMTP, fiscal year, and numbering.',
+      enabled: canToggleSettingsManagement,
+    },
+    {
+      key: 'canViewAllSubmissions',
+      label: 'View all submissions',
+      description: 'Can view all assignee submission details and files.',
+      enabled: canToggleViewAllSubmissions,
     },
     {
       key: 'canManageReceives',
@@ -235,6 +255,12 @@ export function UsersClient({
           ? formData.canManagePriorities
           : false,
         canManageUsers: canToggleUserManagement ? formData.canManageUsers : false,
+        canManageSettings: canToggleSettingsManagement
+          ? formData.canManageSettings
+          : false,
+        canViewAllSubmissions: canToggleViewAllSubmissions
+          ? formData.canViewAllSubmissions
+          : false,
         canManageReceives: canToggleReceiveManagement
           ? formData.canManageReceives
           : false,
@@ -338,7 +364,7 @@ export function UsersClient({
                     Role
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Task Creation
+                    Dispatch
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Admin Permissions
@@ -404,6 +430,8 @@ export function UsersClient({
                             { flag: user.canManageWorkcenters, label: 'Workcenters' },
                             { flag: user.canManagePriorities, label: 'Priorities' },
                             { flag: user.canManageUsers, label: 'Users' },
+                            { flag: user.canManageSettings, label: 'Settings' },
+                            { flag: user.canViewAllSubmissions, label: 'All submissions' },
                             { flag: user.canManageReceives, label: 'Receives' },
                             { flag: user.canApproveCompletions, label: 'Completion approvals' },
                             { flag: user.canRevertCompletions, label: 'Revert to ongoing' },
@@ -420,6 +448,8 @@ export function UsersClient({
                             user.canManageWorkcenters ||
                             user.canManagePriorities ||
                             user.canManageUsers ||
+                            user.canManageSettings ||
+                            user.canViewAllSubmissions ||
                             user.canManageReceives ||
                             user.canApproveCompletions ||
                             user.canRevertCompletions
@@ -564,7 +594,7 @@ export function UsersClient({
               }
             />
             <span className="text-sm text-gray-700">
-              Allow this user to create and assign tasks.
+              Allow this user to create and assign dispatches.
               {!canToggleTaskCreation && (
                 <span className="block text-xs text-gray-500">
                   Only superadmins can change this setting.
@@ -676,6 +706,7 @@ export function UsersClient({
           canToggleUserManagement={canToggleUserManagement}
           canToggleCompletionApproval={canToggleCompletionApproval}
           canToggleReceiveManagement={canToggleReceiveManagement}
+          canToggleSettingsManagement={canToggleSettingsManagement}
           canToggleCompletionRevert={canToggleCompletionRevert}
           canToggleReportAccess={canToggleReportAccess}
           workcenters={workcenterOptions}

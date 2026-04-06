@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
         mustChangePassword: true,
         createdAt: true,
         canCreateTasks: true,
+        canManageSettings: true,
+        canViewAllSubmissions: true,
         includeInAllStaff: true,
       },
     })

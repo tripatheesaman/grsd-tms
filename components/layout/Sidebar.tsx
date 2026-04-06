@@ -19,6 +19,7 @@ interface NavItem {
   requiresWorkcenterPermission?: boolean
   requiresPriorityPermission?: boolean
   requiresUserPermission?: boolean
+  requiresSettingsPermission?: boolean
   requiresCompletionPermission?: boolean
   requiresReceivePermission?: boolean
   requiresReportsPermission?: boolean
@@ -32,6 +33,7 @@ interface SidebarProps {
   canManageWorkcenters?: boolean
   canManagePriorities?: boolean
   canManageUsers?: boolean
+  canManageSettings?: boolean
   canManageReceives?: boolean
   canApproveCompletions?: boolean
   canViewReports?: boolean
@@ -48,7 +50,7 @@ const navigation: NavItem[] = [
     ),
   },
   {
-    name: 'Tasks',
+    name: 'Dispatches',
     href: '/tasks',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,7 +59,7 @@ const navigation: NavItem[] = [
     ),
   },
   {
-    name: 'Due Tasks',
+    name: 'Due Dispatches',
     href: '/tasks/due',
     showBadge: true,
     icon: (
@@ -128,7 +130,23 @@ const navigation: NavItem[] = [
     requiresUserPermission: true,
   },
   {
-    name: 'Completion Requests',
+    name: 'Settings',
+    href: '/settings',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M11.983 5.5a1.5 1.5 0 011.034.412l.909.878a1.5 1.5 0 001.458.36l1.26-.336a1.5 1.5 0 011.821.95l.467 1.221a1.5 1.5 0 001.098.949l1.3.289a1.5 1.5 0 011.167 1.689l-.162 1.299a1.5 1.5 0 00.473 1.422l.95.887a1.5 1.5 0 01.18 2.132l-.843 1.002a1.5 1.5 0 00-.303 1.476l.438 1.23a1.5 1.5 0 01-.939 1.83l-1.223.46a1.5 1.5 0 00-.945 1.103l-.282 1.301a1.5 1.5 0 01-1.683 1.174l-1.3-.154a1.5 1.5 0 00-1.42.478l-.882.954a1.5 1.5 0 01-2.132.187l-1.006-.838a1.5 1.5 0 00-1.477-.296l-1.228.444a1.5 1.5 0 01-1.834-.933l-.466-1.22a1.5 1.5 0 00-1.103-.944l-1.302-.282a1.5 1.5 0 01-1.174-1.683l.154-1.3a1.5 1.5 0 00-.478-1.42l-.954-.882a1.5 1.5 0 01-.187-2.132l.838-1.006a1.5 1.5 0 00.296-1.477l-.444-1.228a1.5 1.5 0 01.933-1.834l1.22-.466a1.5 1.5 0 00.944-1.103l.282-1.302a1.5 1.5 0 011.683-1.174l1.3.154a1.5 1.5 0 001.42-.478l.882-.954a1.5 1.5 0 011.08-.487z"
+        />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
+      </svg>
+    ),
+    requiresSettingsPermission: true,
+  },
+  {
+    name: 'Dispatch Completion Requests',
     href: '/tasks/completions',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,6 +196,7 @@ export function Sidebar({
   canManageWorkcenters = false,
   canManagePriorities = false,
   canManageUsers = false,
+  canManageSettings = false,
   canManageReceives = false,
   canApproveCompletions = false,
   canViewReports = false,
@@ -212,6 +231,13 @@ export function Sidebar({
       return false
     }
     if (item.requiresUserPermission && !canManageUsers && userRole !== 'SUPERADMIN') {
+      return false
+    }
+    if (
+      item.requiresSettingsPermission &&
+      !canManageSettings &&
+      userRole !== 'SUPERADMIN'
+    ) {
       return false
     }
     if (

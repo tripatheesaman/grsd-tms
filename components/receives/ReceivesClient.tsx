@@ -45,6 +45,10 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
   const [closingReceive, setClosingReceive] = useState<ReceiveWithMeta | null>(
     null
   )
+  const [deletingReceive, setDeletingReceive] = useState<ReceiveWithMeta | null>(
+    null
+  )
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const openReceives = receives.filter((receive) => receive.status !== 'CLOSED')
   const closedReceives = receives.filter((receive) => receive.status === 'CLOSED')
@@ -106,6 +110,29 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
       router.refresh()
     } catch (error) {
       toast.error('Failed to close receive')
+    }
+  }
+
+  const handleDeleteReceive = async () => {
+    if (!deletingReceive) return
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch(withBasePath(`/api/receives/${deletingReceive.id}`), {
+        method: 'DELETE',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to delete receive')
+        return
+      }
+      toast.success('Receive deleted')
+      setDeletingReceive(null)
+      router.refresh()
+    } catch (error) {
+      toast.error('Failed to delete receive')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -197,7 +224,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                           <div className="flex justify-end gap-2">
                             <Link href={`/tasks/new?receiveId=${receive.id}`}>
                               <Button size="sm">
-                                Assign
+                                Dispatch
                               </Button>
                             </Link>
                             <Button
@@ -206,6 +233,13 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                               onClick={() => setClosingReceive(receive)}
                             >
                               Close
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={() => setDeletingReceive(receive)}
+                            >
+                              Delete
                             </Button>
                           </div>
                         ) : (
@@ -239,6 +273,7 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                     <th className="px-4 py-2 text-left font-semibold text-gray-600">Received Date</th>
                     <th className="px-4 py-2 text-left font-semibold text-gray-600">Closed At</th>
                     <th className="px-4 py-2 text-left font-semibold text-gray-600">Status</th>
+                    <th className="px-4 py-2 text-right font-semibold text-gray-600">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -255,6 +290,19 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="success">CLOSED</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {canManage ? (
+                          <div className="flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={() => setDeletingReceive(receive)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -273,6 +321,17 @@ export function ReceivesClient({ receives, canManage }: ReceivesClientProps) {
         variant="warning"
         onConfirm={handleCloseReceive}
         onClose={() => setClosingReceive(null)}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(deletingReceive)}
+        title="Delete receive"
+        message="Deleting will permanently remove this receive record. This cannot be undone."
+        confirmText="Delete"
+        variant="danger"
+        onConfirm={handleDeleteReceive}
+        onClose={() => setDeletingReceive(null)}
+        isLoading={isDeleting}
       />
 
       <Modal

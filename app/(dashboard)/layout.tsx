@@ -29,6 +29,7 @@ export default async function DashboardLayout({
         canManageWorkcenters: true,
         canManagePriorities: true,
         canManageUsers: true,
+        canManageSettings: true,
         canManageReceives: true,
         canApproveCompletions: true,
         canRevertCompletions: true,
@@ -51,7 +52,29 @@ export default async function DashboardLayout({
       status: {
         in: ['ACTIVE', 'IN_PROGRESS'],
       },
-      assignedToId: user.userId,
+      OR: [
+        { assignedToId: user.userId },
+        {
+          assignments: {
+            some: { userId: user.userId },
+          },
+        },
+      ],
+      AND: [
+        {
+          OR: [
+            { submissions: { none: { userId: user.userId } } },
+            {
+              submissions: {
+                some: {
+                  userId: user.userId,
+                  status: { in: ['PENDING', 'REJECTED'] },
+                },
+              },
+            },
+          ],
+        },
+      ],
     },
     }),
     (userData.canApproveCompletions || userData.role === 'SUPERADMIN'
@@ -74,6 +97,7 @@ export default async function DashboardLayout({
         canManageWorkcenters={userData.canManageWorkcenters || false}
         canManagePriorities={userData.canManagePriorities || false}
         canManageUsers={userData.canManageUsers || false}
+        canManageSettings={userData.canManageSettings || false}
         canManageReceives={userData.canManageReceives || false}
         canApproveCompletions={userData.canApproveCompletions || false}
         canViewReports={userData.canViewReports || false}

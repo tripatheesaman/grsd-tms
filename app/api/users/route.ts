@@ -18,20 +18,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!canManageUsers(user.role as any)) {
-      return NextResponse.json(
-        { error: 'You do not have permission to manage users' },
-        { status: 403 }
-      )
-    }
-
     const currentUser = await prisma.user.findUnique({
       where: { id: user.userId },
-      select: { role: true },
+      select: { role: true, canManageUsers: true },
     })
 
     if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (
+      !canManageUsers(
+        currentUser.role as UserRole,
+        currentUser.canManageUsers ?? false
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'You do not have permission to manage users' },
+        { status: 403 }
+      )
     }
 
     const visibleRoles = getVisibleRoles(currentUser.role as UserRole)
@@ -64,6 +69,8 @@ export async function GET(request: NextRequest) {
         canManageWorkcenters: true,
         canManagePriorities: true,
         canManageUsers: true,
+        canManageSettings: true,
+        canViewAllSubmissions: true,
         canManageReceives: true,
         canApproveCompletions: true,
         canRevertCompletions: true,
@@ -89,20 +96,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!canManageUsers(user.role as any)) {
-      return NextResponse.json(
-        { error: 'You do not have permission to create users' },
-        { status: 403 }
-      )
-    }
-
     const currentUser = await prisma.user.findUnique({
       where: { id: user.userId },
-      select: { id: true, role: true, name: true, email: true },
+      select: {
+        id: true,
+        role: true,
+        name: true,
+        email: true,
+        canManageUsers: true,
+      },
     })
 
     if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (
+      !canManageUsers(
+        currentUser.role as UserRole,
+        currentUser.canManageUsers ?? false
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'You do not have permission to create users' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -119,6 +137,8 @@ export async function POST(request: NextRequest) {
       canManagePriorities,
       canManageUsers: bodyCanManageUsers,
       canManageReceives: bodyCanManageReceives,
+      canManageSettings: bodyCanManageSettings,
+      canViewAllSubmissions: bodyCanViewAllSubmissions,
       canApproveCompletions: bodyCanApproveCompletions,
       canRevertCompletions: bodyCanRevertCompletions,
       designation,
@@ -221,6 +241,10 @@ export async function POST(request: NextRequest) {
           currentUser.role === 'SUPERADMIN' ? !!canManagePriorities : false,
         canManageUsers:
           currentUser.role === 'SUPERADMIN' ? !!bodyCanManageUsers : false,
+        canManageSettings:
+          currentUser.role === 'SUPERADMIN' ? !!bodyCanManageSettings : false,
+        canViewAllSubmissions:
+          currentUser.role === 'SUPERADMIN' ? !!bodyCanViewAllSubmissions : false,
         canManageReceives:
           currentUser.role === 'SUPERADMIN' ? !!bodyCanManageReceives : false,
         canApproveCompletions:
@@ -250,6 +274,8 @@ export async function POST(request: NextRequest) {
         canManageWorkcenters: true,
         canManagePriorities: true,
         canManageUsers: true,
+        canManageSettings: true,
+        canViewAllSubmissions: true,
         canManageReceives: true,
         canApproveCompletions: true,
         canRevertCompletions: true,

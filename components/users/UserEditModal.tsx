@@ -23,6 +23,8 @@ interface User {
   canManageWorkcenters?: boolean
   canManagePriorities?: boolean
   canManageUsers?: boolean
+  canManageSettings?: boolean
+  canViewAllSubmissions?: boolean
   canManageReceives?: boolean
   canApproveCompletions?: boolean
   canRevertCompletions?: boolean
@@ -46,6 +48,7 @@ interface UserEditModalProps {
   canToggleWorkcenterManagement: boolean
   canTogglePriorityManagement: boolean
   canToggleUserManagement: boolean
+  canToggleSettingsManagement: boolean
   canToggleCompletionApproval: boolean
   canToggleReceiveManagement: boolean
   canToggleCompletionRevert: boolean
@@ -65,6 +68,7 @@ export function UserEditModal({
   canToggleWorkcenterManagement,
   canTogglePriorityManagement,
   canToggleUserManagement,
+  canToggleSettingsManagement,
   canToggleCompletionApproval,
   canToggleReceiveManagement,
   canToggleCompletionRevert,
@@ -89,6 +93,8 @@ export function UserEditModal({
     canManageWorkcenters: user.canManageWorkcenters ?? false,
     canManagePriorities: user.canManagePriorities ?? false,
     canManageUsers: user.canManageUsers ?? false,
+    canManageSettings: user.canManageSettings ?? false,
+    canViewAllSubmissions: user.canViewAllSubmissions ?? false,
     canManageReceives: user.canManageReceives ?? false,
     canApproveCompletions: user.canApproveCompletions ?? false,
     canRevertCompletions: user.canRevertCompletions ?? false,
@@ -112,6 +118,8 @@ export function UserEditModal({
         canManageWorkcenters: user.canManageWorkcenters ?? false,
         canManagePriorities: user.canManagePriorities ?? false,
         canManageUsers: user.canManageUsers ?? false,
+        canManageSettings: user.canManageSettings ?? false,
+        canViewAllSubmissions: user.canViewAllSubmissions ?? false,
         canManageReceives: user.canManageReceives ?? false,
         canApproveCompletions: user.canApproveCompletions ?? false,
         canRevertCompletions: user.canRevertCompletions ?? false,
@@ -155,6 +163,8 @@ export function UserEditModal({
       canManageWorkcenters: formData.canManageWorkcenters,
       canManagePriorities: formData.canManagePriorities,
       canManageUsers: formData.canManageUsers,
+      canManageSettings: formData.canManageSettings,
+      canViewAllSubmissions: formData.canViewAllSubmissions,
       canManageReceives: formData.canManageReceives,
       canApproveCompletions: formData.canApproveCompletions,
       canRevertCompletions: formData.canRevertCompletions,
@@ -265,7 +275,7 @@ export function UserEditModal({
             }
           />
           <span className="text-sm text-gray-700">
-            Allow this user to create and assign tasks.
+            Allow this user to create and assign dispatches.
             {!canToggleTaskCreation && (
               <span className="block text-xs text-gray-500">
                 Only superadmins can change this setting.
@@ -422,6 +432,51 @@ export function UserEditModal({
                 Only superadmins can change this setting.
               </span>
             )}
+          </span>
+        </label>
+      )}
+      {canToggleSettingsManagement && (
+        <label
+          className={`flex items-start gap-3 rounded-md border border-gray-200 p-3 ${
+            !canToggleSettingsManagement ? 'opacity-60 cursor-not-allowed' : ''
+          }`}
+        >
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            checked={formData.canManageSettings}
+            disabled={!canToggleSettingsManagement}
+            onChange={(e) =>
+              setFormData({ ...formData, canManageSettings: e.target.checked })
+            }
+          />
+          <span className="text-sm text-gray-700">
+            Allow this user to manage system settings.
+            {!canToggleSettingsManagement && (
+              <span className="block text-xs text-gray-500">
+                Only superadmins can change this setting.
+              </span>
+            )}
+          </span>
+        </label>
+      )}
+      {canToggleCompletionApproval && (
+        <label
+          className={`flex items-start gap-3 rounded-md border border-gray-200 p-3 ${
+            !canToggleCompletionApproval ? 'opacity-60 cursor-not-allowed' : ''
+          }`}
+        >
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            checked={formData.canViewAllSubmissions}
+            disabled={!canToggleCompletionApproval}
+            onChange={(e) =>
+              setFormData({ ...formData, canViewAllSubmissions: e.target.checked })
+            }
+          />
+          <span className="text-sm text-gray-700">
+            Allow this user to view all assignee submission details.
           </span>
         </label>
       )}

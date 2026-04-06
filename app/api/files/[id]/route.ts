@@ -25,6 +25,11 @@ export async function GET(
             id: true,
             assignedToId: true,
             createdById: true,
+            assignments: {
+              select: {
+                userId: true,
+              },
+            },
           },
         },
       },
@@ -37,6 +42,7 @@ export async function GET(
     
     const hasAccess =
       attachment.task.assignedToId === user.userId ||
+      attachment.task.assignments.some((assignment) => assignment.userId === user.userId) ||
       attachment.task.createdById === user.userId ||
       user.role === 'SUPERADMIN' ||
       user.role === 'DIRECTOR'

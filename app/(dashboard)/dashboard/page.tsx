@@ -236,11 +236,32 @@ export default async function DashboardPage() {
                 },
               },
             ],
+            AND: [
+              {
+                OR: [
+                  { submissions: { none: { userId: user.userId } } },
+                  {
+                    submissions: {
+                      some: {
+                        userId: user.userId,
+                        status: { in: ['PENDING', 'REJECTED'] },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
           },
           include: {
             assignedTo: { select: { id: true, name: true, email: true } },
             assignments: {
               include: { user: { select: { id: true, name: true, email: true } } },
+            },
+            actions: {
+              select: {
+                actionType: true,
+                performedById: true,
+              },
             },
             priority: { select: { id: true, name: true, order: true } },
           },
@@ -262,6 +283,21 @@ export default async function DashboardPage() {
                 },
               },
             ],
+            AND: [
+              {
+                OR: [
+                  { submissions: { none: { userId: user.userId } } },
+                  {
+                    submissions: {
+                      some: {
+                        userId: user.userId,
+                        status: { in: ['PENDING', 'REJECTED'] },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
           },
         }),
         prisma.task.count({
@@ -277,6 +313,21 @@ export default async function DashboardPage() {
                 assignments: {
                   some: { userId: user.userId },
                 },
+              },
+            ],
+            AND: [
+              {
+                OR: [
+                  { submissions: { none: { userId: user.userId } } },
+                  {
+                    submissions: {
+                      some: {
+                        userId: user.userId,
+                        status: { in: ['PENDING', 'REJECTED'] },
+                      },
+                    },
+                  },
+                ],
               },
             ],
           },
@@ -453,7 +504,7 @@ export default async function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-6">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.4em] text-white/70">
-              Nepal Airlines • Ground Support Department
+              Nepal Airlines Corporation • Ground Support Department
             </p>
             <h1 className="text-3xl font-bold tracking-tight">{heroTitle}</h1>
             <p className="text-base font-semibold text-white">{professionalGreeting}</p>

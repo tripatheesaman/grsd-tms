@@ -14,7 +14,29 @@ export default async function DueTasksPage() {
       status: {
         in: ['ACTIVE', 'IN_PROGRESS'],
       },
-      assignedToId: user.userId,
+      OR: [
+        { assignedToId: user.userId },
+        {
+          assignments: {
+            some: { userId: user.userId },
+          },
+        },
+      ],
+      AND: [
+        {
+          OR: [
+            { submissions: { none: { userId: user.userId } } },
+            {
+              submissions: {
+                some: {
+                  userId: user.userId,
+                  status: { in: ['PENDING', 'REJECTED'] },
+                },
+              },
+            },
+          ],
+        },
+      ],
     },
     include: {
       createdBy: {

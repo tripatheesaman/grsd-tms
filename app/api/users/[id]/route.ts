@@ -16,22 +16,27 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!canManageUsers(user.role as any)) {
-      return NextResponse.json(
-        { error: 'You do not have permission to edit users' },
-        { status: 403 }
-      )
-    }
-
     const { id } = await params
 
     const currentUser = await prisma.user.findUnique({
       where: { id: user.userId },
-      select: { role: true },
+      select: { role: true, canManageUsers: true },
     })
 
     if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (
+      !canManageUsers(
+        currentUser.role as UserRole,
+        currentUser.canManageUsers ?? false
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'You do not have permission to edit users' },
+        { status: 403 }
+      )
     }
     const body = await request.json()
 
@@ -46,6 +51,8 @@ export async function PATCH(
       canManageWorkcenters,
       canManagePriorities,
       canManageUsers: bodyCanManageUsers,
+      canManageSettings: bodyCanManageSettings,
+      canViewAllSubmissions: bodyCanViewAllSubmissions,
       canManageReceives: bodyCanManageReceives,
       canApproveCompletions: bodyCanApproveCompletions,
       canRevertCompletions: bodyCanRevertCompletions,
@@ -180,6 +187,18 @@ export async function PATCH(
       updateData.canManageUsers = bodyCanManageUsers
     }
     if (
+      typeof bodyCanManageSettings === 'boolean' &&
+      currentUser.role === 'SUPERADMIN'
+    ) {
+      updateData.canManageSettings = bodyCanManageSettings
+    }
+    if (
+      typeof bodyCanViewAllSubmissions === 'boolean' &&
+      currentUser.role === 'SUPERADMIN'
+    ) {
+      updateData.canViewAllSubmissions = bodyCanViewAllSubmissions
+    }
+    if (
       typeof bodyCanManageReceives === 'boolean' &&
       currentUser.role === 'SUPERADMIN'
     ) {
@@ -226,6 +245,8 @@ export async function PATCH(
         canManageWorkcenters: true,
         canManagePriorities: true,
         canManageUsers: true,
+        canManageSettings: true,
+        canViewAllSubmissions: true,
         canManageReceives: true,
         canApproveCompletions: true,
         canRevertCompletions: true,
@@ -262,22 +283,27 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!canManageUsers(user.role as any)) {
-      return NextResponse.json(
-        { error: 'You do not have permission to delete users' },
-        { status: 403 }
-      )
-    }
-
     const { id } = await params
 
     const currentUser = await prisma.user.findUnique({
       where: { id: user.userId },
-      select: { role: true },
+      select: { role: true, canManageUsers: true },
     })
 
     if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (
+      !canManageUsers(
+        currentUser.role as UserRole,
+        currentUser.canManageUsers ?? false
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete users' },
+        { status: 403 }
+      )
     }
 
     

@@ -44,6 +44,7 @@ export type TaskActionType =
   | 'REJECTED'
 export type NotificationType = 'TASK_ASSIGNED' | 'TASK_FORWARDED' | 'TASK_CLOSED' | 'TASK_UPDATED'
 export type ReceiveStatus = 'OPEN' | 'ASSIGNED' | 'CLOSED'
+export type TaskSubmissionStatus = 'PENDING' | 'SUBMITTED' | 'ACKNOWLEDGED' | 'REJECTED'
 
 export interface User {
   id: string
@@ -61,7 +62,9 @@ export interface User {
   canManageWorkcenters?: boolean
   canManagePriorities?: boolean
   canManageUsers?: boolean
+  canManageSettings?: boolean
   canManageReceives?: boolean
+  canViewAllSubmissions?: boolean
   canApproveCompletions?: boolean
   canRevertCompletions?: boolean
   canViewReports?: boolean
@@ -72,6 +75,7 @@ export interface User {
 export interface Task {
   id: string
   recordNumber: string
+  fileNumber?: string | null
   issuanceDate: Date
   issuanceMessage?: string | null
   descriptionOfWork: string
@@ -99,6 +103,28 @@ export interface Task {
   externalAssigneeName?: string | null
   externalAssigneeEmail?: string | null
   receive?: Receive | null
+  submissions?: TaskSubmission[]
+}
+
+export interface TaskSubmission {
+  id: string
+  taskId: string
+  userId: string
+  status: TaskSubmissionStatus
+  submissionDescription?: string | null
+  attachmentFilename?: string | null
+  attachmentFilepath?: string | null
+  attachmentMimeType?: string | null
+  attachmentSize?: number | null
+  submittedAt?: Date | null
+  acknowledgedAt?: Date | null
+  acknowledgedById?: string | null
+  rejectedAt?: Date | null
+  rejectedById?: string | null
+  rejectionReason?: string | null
+  createdAt: Date
+  updatedAt: Date
+  user?: User
 }
 
 export interface TaskAttachment {
