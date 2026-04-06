@@ -13,7 +13,7 @@ interface TaskListProps {
   emptyMessage?: string
 }
 
-export function TaskList({ tasks, title, emptyMessage = 'No tasks found' }: TaskListProps) {
+export function TaskList({ tasks, title, emptyMessage = 'No dispatches found' }: TaskListProps) {
   const getExcerpt = (content: string | null | undefined, length = 150) => {
     const plain = stripHtml(content ?? '')
     if (!plain) return ''
@@ -99,6 +99,35 @@ export function TaskList({ tasks, title, emptyMessage = 'No tasks found' }: Task
               showDeadline && daysLeft <= 7 && daysLeft > 3 && !isOverdue
 
             const isNotice = task.isNotice
+            const submissionProgress = (() => {
+              const internalUserIds = new Set<string>()
+              if ((task as any).assignedTo?.id) {
+                internalUserIds.add((task as any).assignedTo.id)
+              }
+              if ((task as any).assignments && Array.isArray((task as any).assignments)) {
+                ;(task as any).assignments.forEach((assignment: any) => {
+                  if (assignment?.userId) {
+                    internalUserIds.add(assignment.userId)
+                  } else if (assignment?.user?.id) {
+                    internalUserIds.add(assignment.user.id)
+                  }
+                })
+              }
+              if (internalUserIds.size <= 1) return null
+
+              const submittedIds = new Set<string>()
+              if ((task as any).actions && Array.isArray((task as any).actions)) {
+                ;(task as any).actions.forEach((action: any) => {
+                  if (action?.actionType === 'SUBMITTED' && action?.performedById) {
+                    submittedIds.add(action.performedById)
+                  }
+                })
+              }
+              const submittedCount = Array.from(internalUserIds).filter((id) =>
+                submittedIds.has(id)
+              ).length
+              return { submittedCount, totalCount: internalUserIds.size }
+            })()
             return (
               <Link key={task.id} href={`/tasks/${task.id}`}>
                 <div
@@ -126,6 +155,9 @@ export function TaskList({ tasks, title, emptyMessage = 'No tasks found' }: Task
                           {task.recordNumber}
                         </h4>
                       </div>
+                      {task.fileNumber && (
+                        <p className="text-xs text-gray-600 mb-1">File No: {task.fileNumber}</p>
+                      )}
                       <p
                         className={`text-sm line-clamp-2 ${
                           isNotice ? 'text-gray-700 font-medium' : 'text-gray-600'
@@ -222,6 +254,12 @@ export function TaskList({ tasks, title, emptyMessage = 'No tasks found' }: Task
                         <span className="text-gray-500 font-medium">Task completed</span>
                       )}
                   </div>
+                  {submissionProgress && (
+                    <div className="mt-2 text-xs text-indigo-700 font-medium">
+                      Submitted by {submissionProgress.submittedCount} of{' '}
+                      {submissionProgress.totalCount} users
+                    </div>
+                  )}
                 </div>
               </Link>
             )

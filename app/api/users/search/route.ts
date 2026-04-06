@@ -22,12 +22,14 @@ export async function GET(request: NextRequest) {
         OR: [
           { email: { contains: query } },
           { name: { contains: query } },
+          { designation: { contains: query } },
         ],
       },
       select: {
         id: true,
         email: true,
         name: true,
+        designation: true,
       },
       take: 10,
     })

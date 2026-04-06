@@ -55,6 +55,7 @@ interface TaskDetailsClientProps {
     canCreateTasks?: boolean
     canApproveCompletions?: boolean
     canRevertCompletions?: boolean
+    canViewAllSubmissions?: boolean
   }
 }
 
@@ -85,6 +86,10 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
   const canEdit = (currentUser.role === 'SUPERADMIN' || currentUser.role === 'DIRECTOR') && 
     !(task.status === 'COMPLETED' && !task.acknowledgedById)
   const canDelete = currentUser.role === 'SUPERADMIN' || currentUser.role === 'DIRECTOR'
+  const canModerateSubmissions =
+    currentUser.role === 'SUPERADMIN' ||
+    currentUser.canApproveCompletions ||
+    currentUser.canViewAllSubmissions
   const toast = useToast()
 
   
@@ -127,12 +132,55 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
     }
   }
 
+  const handleSubmissionDecision = async (
+    targetUserId: string,
+    actionType: 'ACKNOWLEDGED' | 'REJECTED'
+  ) => {
+    const rejectionReason =
+      actionType === 'REJECTED'
+        ? window.prompt('Enter rejection reason for this user submission:')
+        : null
+    if (actionType === 'REJECTED' && !rejectionReason?.trim()) {
+      return
+    }
+    try {
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType,
+          targetUserId,
+          rejectionReason: rejectionReason?.trim() || undefined,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to update submission')
+        return
+      }
+      toast.success(
+        actionType === 'ACKNOWLEDGED'
+          ? 'Submission acknowledged for selected user.'
+          : 'Submission rejected for selected user.'
+      )
+      router.refresh()
+    } catch (error) {
+      toast.error('Failed to update submission status.')
+    }
+  }
+
   
   const allAssignees = useMemo(() => {
     try {
       const assignees = new Map<
         string,
-        { key: string; name: string; email: string; assignedAt: Date | null }
+        {
+          key: string
+          name: string
+          email: string
+          assignedAt: Date | null
+          userId?: string
+        }
       >()
 
       if (task?.assignedTo) {
@@ -142,6 +190,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
           name: task.assignedTo.name,
           email: task.assignedTo.email,
           assignedAt: task.createdAt ?? null,
+          userId: task.assignedTo.id,
         })
       }
 
@@ -187,6 +236,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
               name: assignment.user.name,
               email: assignment.user.email,
               assignedAt: assignment.createdAt || task.createdAt || null,
+              userId: assignment.user.id,
             })
           }
         })
@@ -202,6 +252,7 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                 name: action.forwardedTo.name,
                 email: action.forwardedTo.email,
                 assignedAt: action.createdAt,
+                userId: action.forwardedTo.id,
               })
             } else if (action.forwardedToEmail) {
               const key = emailRegex.test(action.forwardedToEmail)
@@ -226,6 +277,34 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
       return []
     }
   }, [task, actions])
+
+  const submittedUserIds = useMemo(() => {
+    const ids = new Set<string>()
+    const submissions = Array.isArray((task as any)?.submissions)
+      ? (task as any).submissions
+      : []
+    submissions.forEach((submission: any) => {
+      if (
+        submission?.userId &&
+        (submission.status === 'SUBMITTED' || submission.status === 'ACKNOWLEDGED')
+      ) {
+        ids.add(submission.userId)
+      }
+    })
+    return ids
+  }, [task])
+
+  const submissionSummary = useMemo(() => {
+    const internalAssignees = allAssignees.filter((assignee) => Boolean(assignee.userId))
+    const submittedCount = internalAssignees.filter(
+      (assignee) => assignee.userId && submittedUserIds.has(assignee.userId)
+    ).length
+    return {
+      totalInternalAssignees: internalAssignees.length,
+      submittedCount,
+      pendingCount: Math.max(0, internalAssignees.length - submittedCount),
+    }
+  }, [allAssignees, submittedUserIds])
 
   const currentAssigneeKey = useMemo(() => {
     if (task?.assignedTo) {
@@ -374,6 +453,9 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                 <p className="text-gray-600">
                   Created on {formatDate(task.createdAt)} by <span className="font-medium">{task.createdBy?.name}</span>
                 </p>
+                {task.fileNumber && (
+                  <p className="text-gray-700 mt-1 font-medium">File No: {task.fileNumber}</p>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 {(canEdit || canDelete) && (
@@ -737,10 +819,27 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assigned To</p>
                 {allAssignees && Array.isArray(allAssignees) && allAssignees.length > 0 ? (
                   <div className="space-y-2">
+                    {submissionSummary.totalInternalAssignees > 1 && (
+                      <div className="p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <p className="text-xs font-semibold text-indigo-900">
+                          Submitted by {submissionSummary.submittedCount} of{' '}
+                          {submissionSummary.totalInternalAssignees} users
+                        </p>
+                        <p className="text-xs text-indigo-700 mt-1">
+                          Pending: {submissionSummary.pendingCount}
+                        </p>
+                      </div>
+                    )}
                     {allAssignees.map((assignee) => {
                       const isCurrent =
                         currentAssigneeKey !== null &&
                         assignee.key === currentAssigneeKey
+                      const hasSubmitted =
+                        Boolean(assignee.userId) &&
+                        submittedUserIds.has(assignee.userId as string)
+                      const submissionRecord = (task as any).submissions?.find(
+                        (submission: any) => submission.userId === assignee.userId
+                      )
                       return (
                         <div
                           key={assignee.key}
@@ -757,6 +856,46 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                               Current Assignee
                             </span>
                           )}
+                          {assignee.userId && (
+                            <span
+                              className={`inline-block mt-1 ml-1 text-xs px-2 py-0.5 rounded ${
+                                hasSubmitted
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-yellow-500 text-white'
+                              }`}
+                            >
+                              {hasSubmitted ? 'Submitted' : 'Pending'}
+                            </span>
+                          )}
+                          {assignee.userId &&
+                            canModerateSubmissions &&
+                            submissionRecord?.status === 'SUBMITTED' && (
+                              <div className="mt-2 flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    handleSubmissionDecision(
+                                      assignee.userId as string,
+                                      'ACKNOWLEDGED'
+                                    )
+                                  }
+                                >
+                                  Acknowledge
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  onClick={() =>
+                                    handleSubmissionDecision(
+                                      assignee.userId as string,
+                                      'REJECTED'
+                                    )
+                                  }
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            )}
                         </div>
                       )
                     })}

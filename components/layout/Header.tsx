@@ -65,20 +65,9 @@ export function Header({ userName, userEmail, userRole }: HeaderProps) {
     <header className="bg-white/80 backdrop-blur border-b border-white/60 shadow-lg shadow-slate-900/5 sticky top-0 z-40">
       <div className="flex items-center justify-between px-4 py-3 md:px-6 gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="relative w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white/80 shadow-lg shadow-blue-900/20">
-            <Image
-              src={withBasePath("/logo.png")}
-              alt="Nepal Airlines"
-              fill
-              className="object-contain p-1"
-              sizes="48px"
-              priority
-              unoptimized
-            />
-          </div>
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
-              Nepal Airlines • Ground Support Department
+              Nepal Airlines Corporation • Ground Support Department
             </p>
             <h1 className="text-xl font-semibold text-slate-900">
               GrSD Receive &amp; Dispatch Logging System

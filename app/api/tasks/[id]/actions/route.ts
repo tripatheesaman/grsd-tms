@@ -39,6 +39,11 @@ export async function POST(
       where: { id },
       include: {
         assignedTo: true,
+        assignments: {
+          select: {
+            userId: true,
+          },
+        },
         createdBy: true,
         complexity: {
           select: { id: true, name: true, order: true },
@@ -60,6 +65,7 @@ export async function POST(
     let forwardedToEmail: string | null = null
     let referenceNumber: string | null = null
     let rejectionReason: string | null = null
+    let targetUserId: string | null = null
     let file: File | null = null
 
     if (contentType.includes('application/json')) {
@@ -68,6 +74,7 @@ export async function POST(
       actionType = body.actionType
       description = body.description || null
       rejectionReason = body.rejectionReason || null
+      targetUserId = body.targetUserId || null
     } else {
       
       const formData = await request.formData()
@@ -77,6 +84,7 @@ export async function POST(
       forwardedToEmail = (formData.get('forwardedToEmail') as string) || null
       referenceNumber = (formData.get('referenceNumber') as string) || null
       rejectionReason = (formData.get('rejectionReason') as string) || null
+      targetUserId = (formData.get('targetUserId') as string) || null
       file = (formData.get('file') as File) || null
     }
 
@@ -111,24 +119,10 @@ export async function POST(
       )
     }
 
-    if (actionType === 'ACKNOWLEDGED' && task.status !== 'COMPLETED') {
-      return NextResponse.json(
-        { error: 'Only completed tasks can be acknowledged' },
-        { status: 400 }
-      )
-    }
-
     if (actionType === 'REJECTED' && !completionApprovalAllowed) {
       return NextResponse.json(
         { error: 'You do not have permission to reject tasks' },
         { status: 403 }
-      )
-    }
-
-    if (actionType === 'REJECTED' && task.status !== 'COMPLETED') {
-      return NextResponse.json(
-        { error: 'Only completed tasks can be rejected' },
-        { status: 400 }
       )
     }
 
@@ -139,10 +133,21 @@ export async function POST(
       )
     }
 
-    if (actionType === 'SUBMITTED' && task.assignedToId !== user.userId) {
+    const isAssignedUser =
+      task.assignedToId === user.userId ||
+      task.assignments.some((assignment) => assignment.userId === user.userId)
+
+    if (actionType === 'SUBMITTED' && !isAssignedUser) {
       return NextResponse.json(
         { error: 'You can only submit work for tasks assigned to you' },
         { status: 403 }
+      )
+    }
+
+    if ((actionType === 'ACKNOWLEDGED' || actionType === 'REJECTED') && !targetUserId) {
+      return NextResponse.json(
+        { error: 'Target assignee is required' },
+        { status: 400 }
       )
     }
 
@@ -270,117 +275,199 @@ export async function POST(
         },
       })
     } else if (actionType === 'SUBMITTED') {
-      newStatus = 'COMPLETED'
+      const submission = await prisma.taskSubmission.upsert({
+        where: {
+          taskId_userId: {
+            taskId: task.id,
+            userId: user.userId,
+          },
+        },
+        create: {
+          taskId: task.id,
+          userId: user.userId,
+          status: 'PENDING',
+        },
+        update: {},
+      })
+
+      if (submission.status === 'SUBMITTED' || submission.status === 'ACKNOWLEDGED') {
+        return NextResponse.json(
+          {
+            error:
+              'You already submitted this task. Wait for director review or rejection before submitting again.',
+          },
+          { status: 400 }
+        )
+      }
+
+      await prisma.taskSubmission.update({
+        where: { id: submission.id },
+        data: {
+          status: 'SUBMITTED',
+          submissionDescription: description,
+          attachmentFilename: file?.name || null,
+          attachmentFilepath: attachmentPath || null,
+          attachmentMimeType: file?.type || null,
+          attachmentSize: file?.size || null,
+          submittedAt: new Date(),
+          rejectedAt: null,
+          rejectedById: null,
+          rejectionReason: null,
+        },
+      })
+
+      const internalAssigneeIds = new Set<string>()
+      if (task.assignedToId) internalAssigneeIds.add(task.assignedToId)
+      task.assignments.forEach((assignment) => assignment.userId && internalAssigneeIds.add(assignment.userId))
+
+      const allSubmissions = await prisma.taskSubmission.findMany({
+        where: { taskId: task.id, userId: { in: Array.from(internalAssigneeIds) } },
+        select: { userId: true, status: true },
+      })
+      const submittedLike = new Set(
+        allSubmissions
+          .filter((s) => s.status === 'SUBMITTED' || s.status === 'ACKNOWLEDGED')
+          .map((s) => s.userId)
+      )
+      const allInternalAssigneesSubmitted = Array.from(internalAssigneeIds).every((assigneeId) =>
+        submittedLike.has(assigneeId)
+      )
+      newStatus = allInternalAssigneesSubmitted ? 'COMPLETED' : 'IN_PROGRESS'
       await prisma.taskHistory.create({
         data: {
           taskId: task.id,
           action: 'TASK_SUBMITTED',
           oldValue: JSON.stringify({ status: task.status }),
-          newValue: JSON.stringify({ status: 'COMPLETED' }),
+          newValue: JSON.stringify({
+            status: newStatus,
+            submittedBy: user.userId,
+            totalRequiredSubmissions: internalAssigneeIds.size,
+            totalSubmissions: submittedLike.size,
+          }),
           changedById: user.userId,
         },
       })
 
-      
-      const directors = await prisma.user.findMany({
+      if (allInternalAssigneesSubmitted) {
+        const directors = await prisma.user.findMany({
+          where: {
+            role: {
+              in: ['SUPERADMIN', 'DIRECTOR', 'DY_DIRECTOR'],
+            },
+          },
+          select: {
+            id: true,
+          },
+        })
+
+        for (const director of directors) {
+          await prisma.notification.create({
+            data: {
+              userId: director.id,
+              taskId: task.id,
+              type: 'TASK_UPDATED',
+              message: `Task completed and awaiting acknowledgment: ${task.recordNumber}`,
+            },
+          })
+        }
+      }
+    } else if (actionType === 'ACKNOWLEDGED') {
+      const targetSubmission = await prisma.taskSubmission.findUnique({
         where: {
-          role: {
-            in: ['SUPERADMIN', 'DIRECTOR', 'DY_DIRECTOR'],
+          taskId_userId: {
+            taskId: task.id,
+            userId: targetUserId!,
           },
         },
-        select: {
-          id: true,
+      })
+      if (!targetSubmission || targetSubmission.status !== 'SUBMITTED') {
+        return NextResponse.json(
+          { error: 'Selected assignee has no pending submission to acknowledge' },
+          { status: 400 }
+        )
+      }
+
+      await prisma.taskSubmission.update({
+        where: { id: targetSubmission.id },
+        data: {
+          status: 'ACKNOWLEDGED',
+          acknowledgedAt: new Date(),
+          acknowledgedById: user.userId,
         },
       })
 
-      for (const director of directors) {
-        await prisma.notification.create({
-          data: {
-            userId: director.id,
-            taskId: task.id,
-            type: 'TASK_UPDATED',
-            message: `Task completed and awaiting acknowledgment: ${task.recordNumber}`,
-          },
-        })
-      }
-    } else if (actionType === 'ACKNOWLEDGED') {
-      
       await prisma.taskHistory.create({
         data: {
           taskId: task.id,
           action: 'TASK_ACKNOWLEDGED',
-          oldValue: JSON.stringify({ acknowledgedById: task.acknowledgedById }),
-          newValue: JSON.stringify({ acknowledgedById: user.userId, acknowledgedAt: new Date() }),
+          oldValue: JSON.stringify({ targetUserId, status: 'SUBMITTED' }),
+          newValue: JSON.stringify({ targetUserId, status: 'ACKNOWLEDGED', acknowledgedById: user.userId, acknowledgedAt: new Date() }),
           changedById: user.userId,
         },
       })
     } else if (actionType === 'REJECTED') {
-      
-      const lastSubmission = await prisma.taskAction.findFirst({
+      const targetSubmission = await prisma.taskSubmission.findUnique({
         where: {
-          taskId: task.id,
-          actionType: 'SUBMITTED',
-        },
-        orderBy: {
-          createdAt: 'desc',
+          taskId_userId: {
+            taskId: task.id,
+            userId: targetUserId!,
+          },
         },
         include: {
-          performedBy: {
+          user: {
             select: { id: true, name: true, email: true },
           },
         },
       })
-
-      
-      let reassignToId: string | null = task.assignedToId
-      let reassignToEmail: string | null = null
-      let reassignToName: string | null = null
-
-      if (lastSubmission?.performedBy) {
-        reassignToId = lastSubmission.performedBy.id
-        reassignToEmail = lastSubmission.performedBy.email
-        reassignToName = lastSubmission.performedBy.name
-      } else if (task.assignedTo) {
-        reassignToId = task.assignedTo.id
-        reassignToEmail = task.assignedTo.email
-        reassignToName = task.assignedTo.name
+      if (!targetSubmission || (targetSubmission.status !== 'SUBMITTED' && targetSubmission.status !== 'ACKNOWLEDGED')) {
+        return NextResponse.json(
+          { error: 'Selected assignee has no submission to reject' },
+          { status: 400 }
+        )
       }
 
-      
+      await prisma.taskSubmission.update({
+        where: { id: targetSubmission.id },
+        data: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          rejectedById: user.userId,
+          rejectionReason,
+          acknowledgedAt: null,
+          acknowledgedById: null,
+        },
+      })
+
       newStatus = 'IN_PROGRESS'
-      newAssignedToId = reassignToId
-      newExternalAssigneeName = null
-      newExternalAssigneeEmail = null
+      newAssignedToId = task.assignedToId
 
       await prisma.taskHistory.create({
         data: {
           taskId: task.id,
           action: 'TASK_REJECTED',
           oldValue: JSON.stringify({ 
-            status: task.status, 
-            assignedToId: task.assignedToId,
-            acknowledgedById: task.acknowledgedById 
+            status: task.status,
+            targetUserId,
+            submissionStatus: targetSubmission.status,
           }),
           newValue: JSON.stringify({ 
-            status: 'IN_PROGRESS', 
-            assignedToId: reassignToId,
-            acknowledgedById: null,
-            acknowledgedAt: null,
+            status: 'IN_PROGRESS',
+            targetUserId,
+            submissionStatus: 'REJECTED',
             rejectionReason 
           }),
           changedById: user.userId,
         },
       })
 
-      
-      if (reassignToId && reassignToEmail && reassignToName) {
+      if (targetSubmission.user?.id && targetSubmission.user?.email) {
         try {
           const currentUserData = await prisma.user.findUnique({
             where: { id: user.userId },
             select: { name: true, email: true },
           })
 
-          await sendTaskRejectionEmail(reassignToEmail, {
+          await sendTaskRejectionEmail(targetSubmission.user.email, {
             recordNumber: task.recordNumber,
             descriptionOfWork: task.descriptionOfWork,
             priority: task.priority?.name || 'Unknown',
@@ -394,7 +481,7 @@ export async function POST(
 
           await prisma.notification.create({
             data: {
-              userId: reassignToId,
+              userId: targetSubmission.user.id,
               taskId: task.id,
               type: 'TASK_UPDATED',
               message: `Task rejected: ${task.recordNumber}. Reason: ${rejectionReason}`,
@@ -415,24 +502,13 @@ export async function POST(
     }
 
     
-    if (actionType === 'ACKNOWLEDGED') {
-      updateData.acknowledgedById = user.userId
-      updateData.acknowledgedAt = new Date()
-    }
-
-    
-    if (actionType === 'REJECTED') {
-      updateData.acknowledgedById = null
-      updateData.acknowledgedAt = null
-    }
-
     const updatedTask = await prisma.task.update({
       where: { id },
       data: updateData,
     })
 
     
-    if (attachmentPath && file) {
+    if (attachmentPath && file && actionType !== 'SUBMITTED') {
       await prisma.taskAttachment.create({
         data: {
           taskId: task.id,

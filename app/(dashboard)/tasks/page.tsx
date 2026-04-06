@@ -27,7 +27,9 @@ export default function TasksPage() {
   
   
   const [recordNumberSearch, setRecordNumberSearch] = useState<string>('')
-  const [descriptionSearch, setDescriptionSearch] = useState<string>('')
+  const [fileNumberSearch, setFileNumberSearch] = useState<string>('')
+  const [subjectSearch, setSubjectSearch] = useState<string>('')
+  const [bodySearch, setBodySearch] = useState<string>('')
   const [assigneeSearch, setAssigneeSearch] = useState<string>('')
   const [creatorSearch, setCreatorSearch] = useState<string>('')
   
@@ -94,8 +96,14 @@ export default function TasksPage() {
       if (recordNumberSearch.trim()) {
         params.append('recordNumber', recordNumberSearch.trim())
       }
-      if (descriptionSearch.trim()) {
-        params.append('description', descriptionSearch.trim())
+      if (fileNumberSearch.trim()) {
+        params.append('fileNumber', fileNumberSearch.trim())
+      }
+      if (subjectSearch.trim()) {
+        params.append('subject', subjectSearch.trim())
+      }
+      if (bodySearch.trim()) {
+        params.append('body', bodySearch.trim())
       }
       if (assigneeSearch.trim()) {
         params.append('assignee', assigneeSearch.trim())
@@ -147,7 +155,9 @@ export default function TasksPage() {
     }
   }, [
     recordNumberSearch,
-    descriptionSearch,
+    fileNumberSearch,
+    subjectSearch,
+    bodySearch,
     assigneeSearch,
     creatorSearch,
     statusFilter,
@@ -169,7 +179,9 @@ export default function TasksPage() {
     return () => clearTimeout(timeoutId)
   }, [
     recordNumberSearch,
-    descriptionSearch,
+    fileNumberSearch,
+    subjectSearch,
+    bodySearch,
     assigneeSearch,
     creatorSearch,
     fetchTasks,
@@ -182,7 +194,9 @@ export default function TasksPage() {
 
   const clearFilters = () => {
     setRecordNumberSearch('')
-    setDescriptionSearch('')
+    setFileNumberSearch('')
+    setSubjectSearch('')
+    setBodySearch('')
     setAssigneeSearch('')
     setCreatorSearch('')
     setStatusFilter('all')
@@ -231,11 +245,11 @@ export default function TasksPage() {
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="text-gray-600 mt-1">Manage and track all tasks</p>
+          <h1 className="text-2xl font-bold text-gray-900">Dispatches</h1>
+          <p className="text-gray-600 mt-1">Manage and track all dispatches</p>
           {canCreateTasks === false && (
             <p className="text-sm text-amber-600 mt-2">
-              You do not have permission to create new tasks.
+              You do not have permission to create dispatches.
             </p>
           )}
         </div>
@@ -244,7 +258,7 @@ export default function TasksPage() {
           disabled={!canCreateTasks}
           variant={canCreateTasks ? 'primary' : 'outline'}
         >
-          Create New Task
+          New Dispatch
         </Button>
       </div>
 
@@ -271,15 +285,31 @@ export default function TasksPage() {
                 type="text"
                 value={recordNumberSearch}
                 onChange={(e) => setRecordNumberSearch(e.target.value)}
-                placeholder="e.g., TMS-ABC123"
+                placeholder="e.g., D-2083/84-1"
               />
               <Input
-                label="Description"
+                label="File Number"
                 type="text"
-                value={descriptionSearch}
-                onChange={(e) => setDescriptionSearch(e.target.value)}
-                placeholder="Search in description..."
+                value={fileNumberSearch}
+                onChange={(e) => setFileNumberSearch(e.target.value)}
+                placeholder="e.g., FILE-123"
               />
+              <Input
+                label="Subject"
+                type="text"
+                value={subjectSearch}
+                onChange={(e) => setSubjectSearch(e.target.value)}
+                placeholder="Search linked receive subject..."
+              />
+              <Input
+                label="Body"
+                type="text"
+                value={bodySearch}
+                onChange={(e) => setBodySearch(e.target.value)}
+                placeholder="Search dispatch body..."
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <Input
                 label="Assignee"
                 type="text"
@@ -363,8 +393,8 @@ export default function TasksPage() {
               value={assignedFilter}
               onChange={(e) => setAssignedFilter(e.target.value)}
               options={[
-                { value: 'all', label: 'All Tasks' },
-                { value: 'me', label: 'My Tasks' },
+                { value: 'all', label: 'All Dispatches' },
+                { value: 'me', label: 'My Dispatches' },
                 { value: 'unassigned', label: 'Unassigned' },
               ]}
             />
@@ -392,7 +422,7 @@ export default function TasksPage() {
       ) : tasks.length === 0 ? (
         <Card>
           <div className="text-center py-12">
-            <p className="text-gray-500">No tasks found</p>
+            <p className="text-gray-500">No dispatches found</p>
             <Button
               variant="outline"
               onClick={clearFilters}
@@ -417,6 +447,40 @@ export default function TasksPage() {
               ? calculateDaysUntilDeadline(task.assignedCompletionDate)
               : 0
             const isNotice = task.isNotice
+            const submissionProgress = (() => {
+              const internalUserIds = new Set<string>()
+              if (task.assignedTo?.id) {
+                internalUserIds.add(task.assignedTo.id)
+              }
+              if ((task as any).assignments && Array.isArray((task as any).assignments)) {
+                ;(task as any).assignments.forEach((assignment: any) => {
+                  if (assignment?.userId) {
+                    internalUserIds.add(assignment.userId)
+                  } else if (assignment?.user?.id) {
+                    internalUserIds.add(assignment.user.id)
+                  }
+                })
+              }
+
+              if (internalUserIds.size <= 1) return null
+
+              const submittedIds = new Set<string>()
+              if ((task as any).actions && Array.isArray((task as any).actions)) {
+                ;(task as any).actions.forEach((action: any) => {
+                  if (action?.actionType === 'SUBMITTED' && action?.performedById) {
+                    submittedIds.add(action.performedById)
+                  }
+                })
+              }
+
+              const submittedCount = Array.from(internalUserIds).filter((id) =>
+                submittedIds.has(id)
+              ).length
+              return {
+                submittedCount,
+                totalCount: internalUserIds.size,
+              }
+            })()
             return (
               <Link key={task.id} href={`/tasks/${task.id}`}>
                 <Card className={`hover:shadow-md transition-shadow cursor-pointer ${
@@ -441,6 +505,9 @@ export default function TasksPage() {
                           {isNotice ? 'Posted' : 'Created'} by {task.createdBy?.name || 'Unknown'} on{' '}
                           {formatDate(task.createdAt)}
                         </p>
+                        {task.fileNumber && (
+                          <p className="text-sm text-gray-600">File No: {task.fileNumber}</p>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         {!isNotice && (
@@ -554,6 +621,12 @@ export default function TasksPage() {
                         )}
                       </div>
                     </div>
+                    {submissionProgress && (
+                      <div className="mt-3 text-xs text-indigo-700 font-medium">
+                        Submitted by {submissionProgress.submittedCount} of{' '}
+                        {submissionProgress.totalCount} users
+                      </div>
+                    )}
                   </div>
                 </Card>
               </Link>

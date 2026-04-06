@@ -46,8 +46,14 @@ export function canAccessDatabase(userRole: UserRole): boolean {
   return userRole === ROLES.SUPERADMIN
 }
 
-export function canManageUsers(userRole: UserRole): boolean {
-  return userRole === ROLES.SUPERADMIN
+export function canManageUsers(
+  userRole: UserRole,
+  hasManageUsersPermission = false
+): boolean {
+  if (userRole === ROLES.SUPERADMIN) {
+    return true
+  }
+  return hasManageUsersPermission
 }
 
 export function canAcknowledgeTask(

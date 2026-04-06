@@ -17,12 +17,15 @@ export default async function UsersPage() {
 
   const currentUserData = await prisma.user.findUnique({
     where: { id: user.userId },
-    select: { role: true },
+    select: { role: true, canManageUsers: true },
   })
 
   if (
     !currentUserData ||
-    !canManageUsers(currentUserData.role as UserRole)
+    !canManageUsers(
+      currentUserData.role as UserRole,
+      currentUserData.canManageUsers ?? false
+    )
   ) {
     redirect('/dashboard')
   }
@@ -54,6 +57,8 @@ export default async function UsersPage() {
       canManageWorkcenters: true,
       canManagePriorities: true,
       canManageUsers: true,
+      canManageSettings: true,
+      canViewAllSubmissions: true,
       canManageReceives: true,
       canApproveCompletions: true,
       canRevertCompletions: true,
@@ -70,6 +75,8 @@ export default async function UsersPage() {
     canApproveCompletions: u.canApproveCompletions ?? false,
     canRevertCompletions: u.canRevertCompletions ?? false,
     canManageUsers: u.canManageUsers ?? false,
+    canManageSettings: u.canManageSettings ?? false,
+    canViewAllSubmissions: u.canViewAllSubmissions ?? false,
     canManageComplexities: u.canManageComplexities ?? false,
     canManagePersonnel: u.canManagePersonnel ?? false,
     canManageWorkcenters: u.canManageWorkcenters ?? false,

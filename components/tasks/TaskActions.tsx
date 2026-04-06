@@ -46,7 +46,10 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
   const [referenceNumber, setReferenceNumber] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
 
-  const isAssignedToMe = task.assignedToId === currentUser.id
+  const isAssignedToMe =
+    task.assignedToId === currentUser.id ||
+    (Array.isArray((task as any).assignments) &&
+      (task as any).assignments.some((assignment: any) => assignment.userId === currentUser.id))
   const canClose = canCloseTask(currentUser.role)
   const canRevert =
     canRevertTask(currentUser.role, currentUser.canRevertCompletions) &&
@@ -57,9 +60,19 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
     currentUser.canApproveCompletions
   )
   const canAcknowledge =
-    hasCompletionApproval && task.status === 'COMPLETED' && !task.acknowledgedById
+    false
   const canReject =
-    hasCompletionApproval && task.status === 'COMPLETED' && !task.acknowledgedById
+    false
+  const mySubmission = (task as any).submissions?.find(
+    (submission: any) => submission.userId === currentUser.id
+  )
+  const canSubmitNow =
+    isAssignedToMe &&
+    task.status !== 'CLOSED' &&
+    task.status !== 'COMPLETED' &&
+    (!mySubmission ||
+      mySubmission.status === 'PENDING' ||
+      mySubmission.status === 'REJECTED')
 
   const handleSubmit = async () => {
     if (!description.trim() && !selectedFile) {
@@ -302,7 +315,7 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
           <CardTitle>Actions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isAssignedToMe && task.status !== 'CLOSED' && task.status !== 'COMPLETED' && (
+          {canSubmitNow && (
             <>
               <Button
                 variant="primary"
@@ -320,6 +333,13 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
               </Button>
             </>
           )}
+          {isAssignedToMe &&
+            (mySubmission?.status === 'SUBMITTED' ||
+              mySubmission?.status === 'ACKNOWLEDGED') && (
+              <p className="text-sm text-blue-700 text-center py-2 font-medium">
+                You already submitted this dispatch. You can submit again only if director rejects it.
+              </p>
+            )}
 
           {task.status === 'COMPLETED' && !task.acknowledgedById && (
             <p className="text-sm text-yellow-600 text-center py-2 font-medium">

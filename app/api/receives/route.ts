@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { getNextSequenceValue } from '@/lib/sequences'
+import { getNextReceiveRecordNumber } from '@/lib/sequences'
 
 export async function GET(request: NextRequest) {
   try {
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const referenceNumber = (await getNextSequenceValue('RECEIVE')).toString()
+    const referenceNumber = await getNextReceiveRecordNumber()
 
     const receive = await prisma.receive.create({
       data: {

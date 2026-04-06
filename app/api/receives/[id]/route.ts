@@ -130,3 +130,71 @@ export async function PATCH(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const currentUser = (await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: { role: true, canManageReceives: true } as any,
+    })) as any
+
+    if (
+      !currentUser ||
+      (currentUser.role !== 'SUPERADMIN' && !currentUser.canManageReceives)
+    ) {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete receives' },
+        { status: 403 }
+      )
+    }
+
+    const { id } = await params
+
+    const receive = await prisma.receive.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        _count: {
+          select: {
+            tasks: true,
+          },
+        },
+      },
+    })
+
+    if (!receive) {
+      return NextResponse.json({ error: 'Receive not found' }, { status: 404 })
+    }
+
+    if (receive._count.tasks > 0) {
+      return NextResponse.json(
+        {
+          error:
+            'This receive is already linked to a dispatch and cannot be deleted',
+        },
+        { status: 400 }
+      )
+    }
+
+    await prisma.receive.delete({
+      where: { id },
+    })
+
+    logger.info('Receive deleted', { receiveId: id, deletedBy: user.userId })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    logger.error('Error deleting receive', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+

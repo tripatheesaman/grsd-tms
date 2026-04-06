@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { getNextSequenceValue } from '@/lib/sequences'
+import { getNextDispatchRecordNumber } from '@/lib/sequences'
 import { sendTaskNotificationEmail, sendNoticeEmail } from '@/lib/email'
 import { saveFile } from '@/lib/storage'
 
@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const recordNumber = searchParams.get('recordNumber')
+    const fileNumber = searchParams.get('fileNumber')
+    const subject = searchParams.get('subject')
+    const body = searchParams.get('body')
     const description = searchParams.get('description')
     const assignee = searchParams.get('assignee')
     const creator = searchParams.get('creator')
@@ -57,6 +60,19 @@ export async function GET(request: NextRequest) {
           },
         ],
       })
+      andConditions.push({
+        OR: [
+          { submissions: { none: { userId: user.userId } } },
+          {
+            submissions: {
+              some: {
+                userId: user.userId,
+                status: { in: ['PENDING', 'REJECTED'] },
+              },
+            },
+          },
+        ],
+      })
     } else if (assignedTo === 'unassigned') {
       andConditions.push({ assignedToId: null })
     } else if (assignedTo) {
@@ -72,11 +88,39 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    if (description && description.trim()) {
+    if (fileNumber && fileNumber.trim()) {
       andConditions.push({
-        descriptionOfWork: {
-          contains: description.trim(),
+        fileNumber: {
+          contains: fileNumber.trim(),
         },
+      })
+    }
+
+    if (subject && subject.trim()) {
+      andConditions.push({
+        receive: {
+          subject: {
+            contains: subject.trim(),
+          },
+        },
+      })
+    }
+
+    const bodySearchTerm = body?.trim() || description?.trim()
+    if (bodySearchTerm) {
+      andConditions.push({
+        OR: [
+          {
+            descriptionOfWork: {
+              contains: bodySearchTerm,
+            },
+          },
+          {
+            issuanceMessage: {
+              contains: bodySearchTerm,
+            },
+          },
+        ],
       })
     }
 
@@ -260,6 +304,18 @@ export async function GET(request: NextRequest) {
             select: { id: true, name: true },
           },
           attachments: true,
+          actions: {
+            select: {
+              actionType: true,
+              performedById: true,
+            },
+          },
+          submissions: {
+            select: {
+              userId: true,
+              status: true,
+            },
+          },
           _count: {
             select: { actions: true, notifications: true },
           },
@@ -326,13 +382,14 @@ export async function POST(request: NextRequest) {
       !currentUser.canCreateTasks
     ) {
       return NextResponse.json(
-        { error: 'You do not have permission to create tasks' },
+        { error: 'You do not have permission to dispatch' },
         { status: 403 }
       )
     }
 
     const formData = await request.formData()
     const issuanceMessage = formData.get('issuanceMessage') as string
+    const fileNumber = formData.get('fileNumber') as string
     const descriptionOfWork = formData.get('descriptionOfWork') as string
     const assignedToIds = formData.get('assignedToIds') as string 
     const priorityId = formData.get('priorityId') as string
@@ -346,7 +403,7 @@ export async function POST(request: NextRequest) {
 
     
     
-    if (!descriptionOfWork || !priorityId || !complexityId) {
+    if (!fileNumber?.trim() || !descriptionOfWork || !priorityId || !complexityId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -574,92 +631,9 @@ export async function POST(request: NextRequest) {
       ? `notice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       : null
 
-    const createTaskForAssignee = async (
-      assignee: AssigneeEntry,
-      {
-        status,
-        isNoticeTask,
-        groupId,
-      }: { status: 'ACTIVE' | 'CLOSED'; isNoticeTask: boolean; groupId?: string | null }
-    ) => {
-      const recordNumber = (await getNextSequenceValue('TASK')).toString()
-      const assignedToId = assignee.type === 'internal' ? assignee.userId! : null
-      const externalName =
-        assignee.type === 'external-name' ? assignee.displayName : null
-      const externalEmail =
-        assignee.type === 'external-email' ? assignee.email || null : null
-
-      const task = await prisma.task.create({
-        data: {
-          recordNumber,
-          issuanceMessage: issuanceMessage || null,
-          descriptionOfWork,
-          assignedToId,
-          externalAssigneeName: externalName,
-          externalAssigneeEmail: externalEmail,
-          priorityId: priorityId,
-          complexityId: complexityId,
-          assignedPersonnelId: isNoticeTask ? null : (assignedPersonnelId || null),
-          workcenterId: isNoticeTask ? null : (workcenterId || null),
-          assignedCompletionDate: new Date(assignedCompletionDate),
-          createdById: user.userId,
-          status,
-          isNotice: isNoticeTask,
-          noticeGroupId: isNoticeTask ? groupId : null,
-          receiveId: linkedReceive?.id || null,
-        },
-        include: {
-          createdBy: {
-            select: { id: true, name: true, email: true },
-          },
-          assignedTo: {
-            select: { id: true, name: true, email: true },
-          },
-          priority: {
-            select: { name: true },
-          },
-          complexity: {
-            select: { name: true },
-          },
-        },
-      })
-
-      if (attachmentPath && file) {
-        await prisma.taskAttachment.create({
-          data: {
-            taskId: task.id,
-            filename: file.name,
-            filepath: attachmentPath,
-            fileSize: file.size,
-            mimeType: file.type,
-            uploadedById: user.userId,
-          },
-        })
-      }
-
-      await prisma.taskAction.create({
-        data: {
-          taskId: task.id,
-          actionType: 'CREATED',
-          performedById: user.userId,
-        },
-      })
-
-      await prisma.taskHistory.create({
-        data: {
-          taskId: task.id,
-          action: 'TASK_CREATED',
-          newValue: JSON.stringify({ recordNumber, status, isNotice: isNoticeTask }),
-          changedById: user.userId,
-        },
-      })
-
-      return task
-    }
-
     if (isNotice) {
       
-      const recordNumber = (await getNextSequenceValue('TASK')).toString()
+      const recordNumber = await getNextDispatchRecordNumber()
       
       
       const internalAssignees = assignees.filter(a => a.type === 'internal')
@@ -689,6 +663,7 @@ export async function POST(request: NextRequest) {
       const task = await prisma.task.create({
         data: {
           recordNumber,
+          fileNumber: fileNumber.trim(),
           issuanceMessage: issuanceMessage || null,
           descriptionOfWork,
           assignedToId,
@@ -722,6 +697,13 @@ export async function POST(request: NextRequest) {
             data: {
               taskId: task.id,
               userId: assignee.userId,
+            },
+          })
+          await prisma.taskSubmission.create({
+            data: {
+              taskId: task.id,
+              userId: assignee.userId,
+              status: 'PENDING',
             },
           })
         }
@@ -791,12 +773,108 @@ export async function POST(request: NextRequest) {
 
       createdTasks.push(task)
     } else {
-      for (const assignee of assignees) {
-        const task = await createTaskForAssignee(assignee, {
-          status: 'ACTIVE',
-          isNoticeTask: false,
-        })
+      const recordNumber = await getNextDispatchRecordNumber()
+      const internalAssignees = assignees.filter((a) => a.type === 'internal')
+      const externalEmailAssignees = assignees.filter((a) => a.type === 'external-email')
+      const externalNameAssignees = assignees.filter((a) => a.type === 'external-name')
 
+      const firstInternalAssignee = internalAssignees[0]
+      const assignedToId = firstInternalAssignee?.userId || null
+
+      const externalEmails = externalEmailAssignees
+        .map((a) => a.email)
+        .filter((email): email is string => !!email)
+        .join(', ')
+      const externalNames = externalNameAssignees
+        .map((a) => a.displayName)
+        .filter((name): name is string => !!name)
+        .join(', ')
+
+      const task = await prisma.task.create({
+        data: {
+          recordNumber,
+          fileNumber: fileNumber.trim(),
+          issuanceMessage: issuanceMessage || null,
+          descriptionOfWork,
+          assignedToId,
+          externalAssigneeName: externalNames || null,
+          externalAssigneeEmail: externalEmails || null,
+          priorityId: priorityId,
+          complexityId: complexityId,
+          assignedPersonnelId: assignedPersonnelId || null,
+          workcenterId: workcenterId || null,
+          assignedCompletionDate: new Date(assignedCompletionDate),
+          createdById: user.userId,
+          status: 'ACTIVE',
+          isNotice: false,
+          noticeGroupId: null,
+          receiveId: linkedReceive?.id || null,
+        },
+        include: {
+          createdBy: {
+            select: { id: true, name: true, email: true },
+          },
+          assignedTo: {
+            select: { id: true, name: true, email: true },
+          },
+          priority: {
+            select: { name: true },
+          },
+          complexity: {
+            select: { name: true },
+          },
+        },
+      })
+
+      for (const assignee of internalAssignees) {
+        if (assignee.userId) {
+          await prisma.taskAssignment.create({
+            data: {
+              taskId: task.id,
+              userId: assignee.userId,
+            },
+          })
+          await prisma.taskSubmission.create({
+            data: {
+              taskId: task.id,
+              userId: assignee.userId,
+              status: 'PENDING',
+            },
+          })
+        }
+      }
+
+      if (attachmentPath && file) {
+        await prisma.taskAttachment.create({
+          data: {
+            taskId: task.id,
+            filename: file.name,
+            filepath: attachmentPath,
+            fileSize: file.size,
+            mimeType: file.type,
+            uploadedById: user.userId,
+          },
+        })
+      }
+
+      await prisma.taskAction.create({
+        data: {
+          taskId: task.id,
+          actionType: 'CREATED',
+          performedById: user.userId,
+        },
+      })
+
+      await prisma.taskHistory.create({
+        data: {
+          taskId: task.id,
+          action: 'TASK_CREATED',
+          newValue: JSON.stringify({ recordNumber, status: 'ACTIVE', isNotice: false }),
+          changedById: user.userId,
+        },
+      })
+
+      for (const assignee of assignees) {
         if (assignee.email) {
           try {
             await sendTaskNotificationEmail(assignee.email, {
@@ -817,7 +895,7 @@ export async function POST(request: NextRequest) {
                   userId: assignee.userId,
                   taskId: task.id,
                   type: 'TASK_ASSIGNED',
-                  message: `New task assigned: ${task.recordNumber}`,
+                  message: `New dispatch assigned: ${task.recordNumber}`,
                 },
               })
             }
@@ -825,9 +903,9 @@ export async function POST(request: NextRequest) {
             logger.error('Error sending task notification email', emailError)
           }
         }
-
-        createdTasks.push(task)
       }
+
+      createdTasks.push(task)
     }
 
     logger.info('Task(s) created successfully', {

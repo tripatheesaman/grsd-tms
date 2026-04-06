@@ -25,6 +25,7 @@ export default function NewTaskPage() {
   const toast = useToast()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
+    fileNumber: '',
     issuanceMessage: '',
     descriptionOfWork: '',
     priorityId: '',
@@ -266,6 +267,9 @@ export default function NewTaskPage() {
     if (!formData.descriptionOfWork.trim()) {
       newErrors.descriptionOfWork = 'Description of work is required'
     }
+    if (!formData.fileNumber.trim()) {
+      newErrors.fileNumber = 'File number is required'
+    }
 
     if (!formData.priorityId) {
       newErrors.priorityId = 'Priority is required'
@@ -314,6 +318,7 @@ export default function NewTaskPage() {
     try {
       const formDataToSend = new FormData()
       formDataToSend.append('issuanceMessage', formData.issuanceMessage)
+      formDataToSend.append('fileNumber', formData.fileNumber.trim())
       formDataToSend.append('descriptionOfWork', formData.descriptionOfWork)
       formDataToSend.append('priorityId', formData.priorityId)
       formDataToSend.append('complexityId', formData.complexityId)
@@ -351,12 +356,12 @@ export default function NewTaskPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        toast.error(data.error || 'Failed to create task')
+        toast.error(data.error || 'Failed to dispatch')
         setLoading(false)
         return
       }
 
-      toast.success('Task created successfully!')
+      toast.success('Dispatch created successfully!')
       router.push(`/tasks/${data.task.id}`)
     } catch (error) {
       toast.error('An error occurred. Please try again.')
@@ -377,11 +382,11 @@ export default function NewTaskPage() {
       <div className="max-w-2xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Task Creation Restricted</CardTitle>
+            <CardTitle>Dispatch Restricted</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-gray-600">
-              You do not have permission to create tasks. Please contact a superadmin if you believe this is a mistake.
+              You do not have permission to dispatch. Please contact a superadmin if you believe this is a mistake.
             </p>
             <Button variant="outline" onClick={() => router.push('/tasks')}>
               Back to Tasks
@@ -395,13 +400,13 @@ export default function NewTaskPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Create New Task</h1>
-        <p className="text-gray-600 mt-1">Fill in the details to create a new task</p>
+        <h1 className="text-2xl font-bold text-gray-900">Create New Dispatch</h1>
+        <p className="text-gray-600 mt-1">Fill in the details to create a new dispatch</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Task Details</CardTitle>
+          <CardTitle>Dispatch Details</CardTitle>
         </CardHeader>
         <CardContent>
           {receiveId && (
@@ -446,6 +451,20 @@ export default function NewTaskPage() {
                   This is a notice (will be sent to all selected users and marked as closed)
                 </span>
               </label>
+            </div>
+
+            <div>
+              <Input
+                label="File Number"
+                type="text"
+                value={formData.fileNumber}
+                onChange={(e) =>
+                  setFormData({ ...formData, fileNumber: e.target.value })
+                }
+                placeholder="Enter file number"
+                required
+                error={errors.fileNumber}
+              />
             </div>
 
             <div>
@@ -557,7 +576,7 @@ export default function NewTaskPage() {
                 isLoading={loading}
                 disabled={loading}
               >
-                Create Task
+                Dispatch
               </Button>
               <Button
                 type="button"
