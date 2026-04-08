@@ -22,7 +22,9 @@ export default async function CompletionRequestsPage() {
 
   const canReviewCompletions =
     currentUser &&
-    (currentUser.role === 'SUPERADMIN' || currentUser.canApproveCompletions)
+    (currentUser.role === 'SUPERADMIN' ||
+      currentUser.role === 'DIRECTOR' ||
+      currentUser.canApproveCompletions)
 
   if (!canReviewCompletions) {
     redirect('/dashboard')
@@ -30,8 +32,19 @@ export default async function CompletionRequestsPage() {
 
   const completionTasks = await prisma.task.findMany({
     where: {
-      status: 'COMPLETED',
-      acknowledgedById: null,
+      OR: [
+        {
+          status: 'COMPLETED',
+          acknowledgedById: null,
+        },
+        {
+          submissions: {
+            some: {
+              status: 'SUBMITTED',
+            },
+          },
+        },
+      ],
     },
     include: {
       assignedTo: {
@@ -42,6 +55,14 @@ export default async function CompletionRequestsPage() {
       },
       priority: {
         select: { id: true, name: true },
+      },
+      submissions: {
+        where: { status: 'SUBMITTED' },
+        select: {
+          user: { select: { id: true, name: true } },
+          submittedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
       },
     },
     orderBy: {
@@ -97,7 +118,9 @@ export default async function CompletionRequestsPage() {
                       <span>
                         Submitted by:{' '}
                         <strong>
-                          {task.assignedTo?.name || 'Unassigned'}
+                          {task.submissions?.[0]?.user?.name ||
+                            task.assignedTo?.name ||
+                            'Unassigned'}
                         </strong>
                       </span>
                       <span>
@@ -111,7 +134,11 @@ export default async function CompletionRequestsPage() {
                       )}
                       <span>
                         Completion requested:{' '}
-                        <strong>{formatDateTime(task.updatedAt)}</strong>
+                        <strong>
+                          {formatDateTime(
+                            (task.submissions?.[0]?.submittedAt as any) ?? task.updatedAt
+                          )}
+                        </strong>
                       </span>
                       <span>
                         Due:{' '}

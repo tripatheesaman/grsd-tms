@@ -27,12 +27,26 @@ sleep 5
 
 if [ "${PRISMA_SKIP_DB_INIT:-false}" != "true" ]; then
   PRISMA_MIGRATION_MODE="${PRISMA_MIGRATION_MODE:-deploy}"
+  HAS_MIGRATIONS=false
+  if [ -d "/app/prisma/migrations" ]; then
+    if [ "$(ls -A /app/prisma/migrations 2>/dev/null | wc -l | tr -d ' ')" != "0" ]; then
+      HAS_MIGRATIONS=true
+    fi
+  fi
   if [ "$PRISMA_MIGRATION_MODE" = "push" ]; then
     echo "Applying schema via Prisma db push..."
     $PRISMA_CMD db push --skip-generate 2>&1
   else
+    if [ "$HAS_MIGRATIONS" != "true" ]; then
+      echo "No prisma/migrations found; falling back to Prisma db push..."
+      $PRISMA_CMD db push --skip-generate 2>&1
+    else
     echo "Applying migrations via Prisma migrate deploy..."
-    $PRISMA_CMD migrate deploy 2>&1
+      $PRISMA_CMD migrate deploy 2>&1 || {
+        echo "Prisma migrate deploy failed. If you see P3009 (failed migration recorded), resolve it with prisma migrate resolve, or switch PRISMA_MIGRATION_MODE=push."
+        exit 1
+      }
+    fi
   fi
 else
   echo "Skipping Prisma database initialization (PRISMA_SKIP_DB_INIT=true)"
