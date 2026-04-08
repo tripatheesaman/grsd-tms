@@ -67,8 +67,19 @@ export default async function DashboardLayout({
     (userData.canApproveCompletions || userData.role === 'SUPERADMIN'
       ? prisma.task.count({
           where: {
-            status: 'COMPLETED',
-            acknowledgedById: null,
+            OR: [
+              {
+                status: 'COMPLETED',
+                acknowledgedById: null,
+              },
+              {
+                submissions: {
+                  some: {
+                    status: 'SUBMITTED',
+                  },
+                },
+              },
+            ],
           },
         })
       : Promise.resolve(0)),
