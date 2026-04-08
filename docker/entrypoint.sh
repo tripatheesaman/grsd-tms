@@ -26,8 +26,14 @@ echo "Waiting a few seconds for database to be fully ready..."
 sleep 5
 
 if [ "${PRISMA_SKIP_DB_INIT:-false}" != "true" ]; then
-  echo "Initializing database schema via Prisma db push (no migrations)..."
-  $PRISMA_CMD db push --skip-generate 2>&1
+  PRISMA_MIGRATION_MODE="${PRISMA_MIGRATION_MODE:-deploy}"
+  if [ "$PRISMA_MIGRATION_MODE" = "push" ]; then
+    echo "Applying schema via Prisma db push..."
+    $PRISMA_CMD db push --skip-generate 2>&1
+  else
+    echo "Applying migrations via Prisma migrate deploy..."
+    $PRISMA_CMD migrate deploy 2>&1
+  fi
 else
   echo "Skipping Prisma database initialization (PRISMA_SKIP_DB_INIT=true)"
 fi

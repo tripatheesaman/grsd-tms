@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
@@ -18,6 +18,8 @@ import { TaskEditModal } from './TaskEditModal'
 import { withBasePath } from '@/lib/base-path'
 
 interface TaskDetailsClientProps {
+  forwardBlockUserIds?: string[]
+  forwardBlockEmails?: string[]
   task: Task & {
     attachments: Array<{
       id: string
@@ -59,7 +61,12 @@ interface TaskDetailsClientProps {
   }
 }
 
-export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps) {
+export function TaskDetailsClient({
+  task,
+  currentUser,
+  forwardBlockUserIds = [],
+  forwardBlockEmails = [],
+}: TaskDetailsClientProps) {
   const router = useRouter()
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -77,11 +84,20 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
     task.status !== 'COMPLETED' &&
     task.status !== 'CLOSED' &&
     (isAdminViewer || isCurrentAssignee)
-  const daysLeft = showDeadline
-    ? calculateDaysUntilDeadline(task.assignedCompletionDate)
-    : 0
-  const isOverdue = showDeadline ? daysLeft < 0 : false
-  const isUrgent = showDeadline ? daysLeft <= 3 && !isOverdue : false
+  const [hydratedDaysLeft, setHydratedDaysLeft] = useState<number | null>(null)
+  useEffect(() => {
+    if (!showDeadline) {
+      setHydratedDaysLeft(null)
+      return
+    }
+    setHydratedDaysLeft(calculateDaysUntilDeadline(task.assignedCompletionDate))
+  }, [showDeadline, task.assignedCompletionDate])
+  const isOverdue =
+    showDeadline && hydratedDaysLeft !== null ? hydratedDaysLeft < 0 : false
+  const isUrgent =
+    showDeadline && hydratedDaysLeft !== null
+      ? hydratedDaysLeft <= 3 && !isOverdue
+      : false
 
   const canEdit = (currentUser.role === 'SUPERADMIN' || currentUser.role === 'DIRECTOR') && 
     !(task.status === 'COMPLETED' && !task.acknowledgedById)
@@ -307,6 +323,9 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
   }, [allAssignees, submittedUserIds])
 
   const currentAssigneeKey = useMemo(() => {
+    if ((task as any)?.submissionMode === 'MULTIPLE') {
+      return null
+    }
     if (task?.assignedTo) {
       return `internal:${task.assignedTo.id}`
     }
@@ -320,6 +339,32 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
       return `external-name:${task.externalAssigneeEmail}`
     }
     return null
+  }, [task])
+  const originalAssigneeIds = useMemo(() => {
+    const ids = new Set<string>()
+    const assignments = Array.isArray((task as any)?.assignments)
+      ? (task as any).assignments
+      : []
+    assignments.forEach((assignment: any) => {
+      if (assignment?.isOriginal && assignment?.userId) {
+        ids.add(assignment.userId)
+      }
+    })
+    return ids
+  }, [task])
+
+  const ccAssigneeIds = useMemo(() => {
+    const ids = new Set<string>()
+    if ((task as any)?.submissionMode !== 'SINGLE') return ids
+    const assignments = Array.isArray((task as any)?.assignments)
+      ? (task as any).assignments
+      : []
+    assignments.forEach((assignment: any) => {
+      if (assignment?.isCc && assignment?.userId) {
+        ids.add(assignment.userId)
+      }
+    })
+    return ids
   }, [task])
 
   const getPriorityColor = (priorityName: string) => {
@@ -515,18 +560,20 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                       ? 'bg-red-600 text-white animate-pulse'
                       : isUrgent
                       ? 'bg-orange-500 text-white'
-                      : daysLeft <= 7
+                      : hydratedDaysLeft !== null && hydratedDaysLeft <= 7
                       ? 'bg-yellow-500 text-white'
                       : 'bg-green-500 text-white'
                   }`}>
-                    {isOverdue ? (
-                      <span>⚠️ OVERDUE BY {Math.abs(daysLeft)} DAYS</span>
+                    {hydratedDaysLeft === null ? (
+                      <span>Checking deadline...</span>
+                    ) : isOverdue ? (
+                      <span>⚠️ OVERDUE BY {Math.abs(hydratedDaysLeft)} DAYS</span>
                     ) : isUrgent ? (
-                      <span>⚡ {daysLeft} DAYS LEFT - URGENT!</span>
-                    ) : daysLeft <= 7 ? (
-                      <span>⏰ {daysLeft} DAYS REMAINING</span>
+                      <span>⚡ {hydratedDaysLeft} DAYS LEFT - URGENT!</span>
+                    ) : hydratedDaysLeft <= 7 ? (
+                      <span>⏰ {hydratedDaysLeft} DAYS REMAINING</span>
                     ) : (
-                      <span>✓ {daysLeft} DAYS REMAINING</span>
+                      <span>✓ {hydratedDaysLeft} DAYS REMAINING</span>
                     )}
                   </div>
                 </div>
@@ -832,8 +879,11 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                     )}
                     {allAssignees.map((assignee) => {
                       const isCurrent =
-                        currentAssigneeKey !== null &&
-                        assignee.key === currentAssigneeKey
+                        (task as any)?.submissionMode === 'MULTIPLE'
+                          ? Boolean(assignee.userId) &&
+                            originalAssigneeIds.has(assignee.userId as string)
+                          : currentAssigneeKey !== null &&
+                            assignee.key === currentAssigneeKey
                       const hasSubmitted =
                         Boolean(assignee.userId) &&
                         submittedUserIds.has(assignee.userId as string)
@@ -845,15 +895,23 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                           key={assignee.key}
                           className="p-2 bg-blue-50 rounded-lg border border-blue-200"
                         >
-                          <p className="text-sm font-medium text-gray-900">
-                            {assignee.name}
+                          <p className="text-sm font-medium text-gray-900 flex flex-wrap items-center gap-2">
+                            <span>{assignee.name}</span>
+                            {assignee.userId &&
+                              ccAssigneeIds.has(assignee.userId as string) && (
+                                <Badge variant="default" size="sm" className="font-semibold">
+                                  CC
+                                </Badge>
+                              )}
                           </p>
                           <p className="text-xs text-gray-600">
                             {assignee.email || '—'}
                           </p>
                           {isCurrent && (
                             <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-blue-600 text-white rounded">
-                              Current Assignee
+                              {(task as any)?.submissionMode === 'MULTIPLE'
+                                ? 'Required Assignee'
+                                : 'Current Assignee'}
                             </span>
                           )}
                           {assignee.userId && (
@@ -916,14 +974,16 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
                         ? 'text-red-600'
                         : isUrgent
                         ? 'text-orange-600'
-                        : daysLeft <= 7
+                        : hydratedDaysLeft !== null && hydratedDaysLeft <= 7
                         ? 'text-yellow-600'
                         : 'text-green-600'
                     }`}
                   >
-                    {isOverdue
-                      ? `⚠️ Overdue by ${Math.abs(daysLeft)} days`
-                      : `${daysLeft} days remaining`}
+                    {hydratedDaysLeft === null
+                      ? 'Checking deadline...'
+                      : isOverdue
+                      ? `⚠️ Overdue by ${Math.abs(hydratedDaysLeft)} days`
+                      : `${hydratedDaysLeft} days remaining`}
                   </p>
                 ) : (
                   <p className="text-sm text-gray-500 mt-1">
@@ -968,7 +1028,12 @@ export function TaskDetailsClient({ task, currentUser }: TaskDetailsClientProps)
             </Card>
           )}
 
-          <TaskActions task={task} currentUser={currentUser} />
+          <TaskActions
+            task={task}
+            currentUser={currentUser}
+            forwardBlockUserIds={forwardBlockUserIds}
+            forwardBlockEmails={forwardBlockEmails}
+          />
         </div>
       </div>
 

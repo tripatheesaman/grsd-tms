@@ -4,6 +4,7 @@ import { NotificationPanel } from '@/components/dashboard/NotificationPanel'
 import { TaskList } from '@/components/dashboard/TaskList'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
 import { calculateDaysUntilDeadline, formatDate, stripHtml, truncateText } from '@/lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { UserRole } from '@/types'
@@ -236,21 +237,7 @@ export default async function DashboardPage() {
                 },
               },
             ],
-            AND: [
-              {
-                OR: [
-                  { submissions: { none: { userId: user.userId } } },
-                  {
-                    submissions: {
-                      some: {
-                        userId: user.userId,
-                        status: { in: ['PENDING', 'REJECTED'] },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
+            AND: [dueTasksSubmissionOrClause(user.userId)],
           },
           include: {
             assignedTo: { select: { id: true, name: true, email: true } },
@@ -283,21 +270,7 @@ export default async function DashboardPage() {
                 },
               },
             ],
-            AND: [
-              {
-                OR: [
-                  { submissions: { none: { userId: user.userId } } },
-                  {
-                    submissions: {
-                      some: {
-                        userId: user.userId,
-                        status: { in: ['PENDING', 'REJECTED'] },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
+            AND: [dueTasksSubmissionOrClause(user.userId)],
           },
         }),
         prisma.task.count({
@@ -315,21 +288,7 @@ export default async function DashboardPage() {
                 },
               },
             ],
-            AND: [
-              {
-                OR: [
-                  { submissions: { none: { userId: user.userId } } },
-                  {
-                    submissions: {
-                      some: {
-                        userId: user.userId,
-                        status: { in: ['PENDING', 'REJECTED'] },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
+            AND: [dueTasksSubmissionOrClause(user.userId)],
           },
         }),
         prisma.task.count({

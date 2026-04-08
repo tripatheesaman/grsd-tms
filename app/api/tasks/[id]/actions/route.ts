@@ -5,6 +5,8 @@ import { logger } from '@/lib/logger'
 import { canCloseTask, canRevertTask, canAcknowledgeTask } from '@/lib/roles'
 import { sendTaskForwardEmail, sendTaskNotificationEmail, sendTaskRejectionEmail } from '@/lib/email'
 import { saveFile } from '@/lib/storage'
+import { completionReviewerUserIds } from '@/lib/completion-reviewers'
+import { forwardTargetDisallowedMessage } from '@/lib/forward-guards'
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i
 
@@ -42,6 +44,9 @@ export async function POST(
         assignments: {
           select: {
             userId: true,
+            isOriginal: true,
+            isCc: true,
+            originalAssigneeId: true,
           },
         },
         createdBy: true,
@@ -133,13 +138,43 @@ export async function POST(
       )
     }
 
-    const isAssignedUser =
+    const myAssignment = task.assignments.find(
+      (assignment) => assignment.userId === user.userId
+    )
+    const isOriginalAssignee = Boolean(myAssignment?.isOriginal)
+    const isCcOnly = Boolean(myAssignment?.isCc)
+    const isCurrentHandler =
       task.assignedToId === user.userId ||
       task.assignments.some((assignment) => assignment.userId === user.userId)
 
-    if (actionType === 'SUBMITTED' && !isAssignedUser) {
+    if (actionType === 'SUBMITTED' && !isOriginalAssignee) {
       return NextResponse.json(
-        { error: 'You can only submit work for tasks assigned to you' },
+        { error: 'Only the originally assigned users can submit work for this dispatch' },
+        { status: 403 }
+      )
+    }
+    if (actionType === 'ADD_INFO' && !isCurrentHandler) {
+      return NextResponse.json(
+        { error: 'You can only add info if this dispatch is assigned to you' },
+        { status: 403 }
+      )
+    }
+
+    if (actionType === 'FORWARDED' && !isCurrentHandler) {
+      return NextResponse.json(
+        { error: 'You can only forward if this dispatch is assigned to you' },
+        { status: 403 }
+      )
+    }
+    if (actionType === 'FORWARDED' && task.submissionMode === 'SINGLE' && !isOriginalAssignee) {
+      return NextResponse.json(
+        { error: 'CC users cannot forward this same-work dispatch' },
+        { status: 403 }
+      )
+    }
+    if (actionType === 'FORWARDED' && isCcOnly) {
+      return NextResponse.json(
+        { error: 'CC users cannot forward dispatches' },
         { status: 403 }
       )
     }
@@ -179,6 +214,9 @@ export async function POST(
     let newExternalAssigneeEmail = task.externalAssigneeEmail || null
 
     if (actionType === 'FORWARDED') {
+      const streamOwnerId =
+        myAssignment?.originalAssigneeId ||
+        (isOriginalAssignee ? user.userId : null)
       
       if (forwardedToId && !forwardedToId.startsWith('external-')) {
         
@@ -191,15 +229,57 @@ export async function POST(
             { status: 400 }
           )
         }
+        const blockMsg = forwardTargetDisallowedMessage({
+          createdById: task.createdById,
+          targetUserId: forwardedToId,
+          targetRole: forwardedUser.role,
+        })
+        if (blockMsg) {
+          return NextResponse.json({ error: blockMsg }, { status: 400 })
+        }
         newAssignedToId = forwardedToId
         newExternalAssigneeName = null
         newExternalAssigneeEmail = null
         forwardedToEmail = forwardedUser.email
+        await prisma.taskAssignment.upsert({
+          where: {
+            taskId_userId: {
+              taskId: task.id,
+              userId: forwardedToId,
+            },
+          },
+          create: {
+            taskId: task.id,
+            userId: forwardedToId,
+            isOriginal: false,
+            isCc: false,
+            originalAssigneeId: streamOwnerId,
+          },
+          update: {
+            isCc: false,
+            originalAssigneeId: streamOwnerId,
+          },
+        })
       } else if (forwardedToEmail) {
         
         newAssignedToId = null
         if (emailRegex.test(forwardedToEmail)) {
-          newExternalAssigneeEmail = forwardedToEmail.toLowerCase()
+          const normalized = forwardedToEmail.toLowerCase()
+          const internalMatch = await prisma.user.findFirst({
+            where: { email: normalized },
+            select: { id: true, role: true },
+          })
+          if (internalMatch) {
+            const blockMsg = forwardTargetDisallowedMessage({
+              createdById: task.createdById,
+              targetUserId: internalMatch.id,
+              targetRole: internalMatch.role,
+            })
+            if (blockMsg) {
+              return NextResponse.json({ error: blockMsg }, { status: 400 })
+            }
+          }
+          newExternalAssigneeEmail = normalized
           newExternalAssigneeName = null
         } else {
           newExternalAssigneeName = forwardedToEmail.toUpperCase()
@@ -217,6 +297,28 @@ export async function POST(
           changedById: user.userId,
         },
       })
+      if (isCurrentHandler) {
+        await prisma.taskSubmission.upsert({
+          where: {
+            taskId_userId: {
+              taskId: task.id,
+              userId: user.userId,
+            },
+          },
+          create: {
+            taskId: task.id,
+            userId: user.userId,
+            status: 'FORWARDED',
+            submissionDescription: description,
+            submittedAt: new Date(),
+          },
+          update: {
+            status: 'FORWARDED',
+            submissionDescription: description,
+            submittedAt: new Date(),
+          },
+        })
+      }
 
       
       if (forwardedToId && !forwardedToId.startsWith('external-') && forwardedToEmail) {
@@ -316,9 +418,11 @@ export async function POST(
         },
       })
 
-      const internalAssigneeIds = new Set<string>()
-      if (task.assignedToId) internalAssigneeIds.add(task.assignedToId)
-      task.assignments.forEach((assignment) => assignment.userId && internalAssigneeIds.add(assignment.userId))
+      const internalAssigneeIds = new Set<string>(
+        task.assignments
+          .filter((assignment) => assignment.isOriginal && !assignment.isCc)
+          .map((assignment) => assignment.userId)
+      )
 
       const allSubmissions = await prisma.taskSubmission.findMany({
         where: { taskId: task.id, userId: { in: Array.from(internalAssigneeIds) } },
@@ -329,10 +433,14 @@ export async function POST(
           .filter((s) => s.status === 'SUBMITTED' || s.status === 'ACKNOWLEDGED')
           .map((s) => s.userId)
       )
-      const allInternalAssigneesSubmitted = Array.from(internalAssigneeIds).every((assigneeId) =>
-        submittedLike.has(assigneeId)
+      const allInternalAssigneesSubmitted = Array.from(internalAssigneeIds).every(
+        (assigneeId) => submittedLike.has(assigneeId)
       )
-      newStatus = allInternalAssigneesSubmitted ? 'COMPLETED' : 'IN_PROGRESS'
+      if (task.submissionMode === 'SINGLE') {
+        newStatus = 'COMPLETED'
+      } else {
+        newStatus = allInternalAssigneesSubmitted ? 'COMPLETED' : 'IN_PROGRESS'
+      }
       await prisma.taskHistory.create({
         data: {
           taskId: task.id,
@@ -348,29 +456,45 @@ export async function POST(
         },
       })
 
-      if (allInternalAssigneesSubmitted) {
-        const directors = await prisma.user.findMany({
-          where: {
-            role: {
-              in: ['SUPERADMIN', 'DIRECTOR', 'DY_DIRECTOR'],
-            },
-          },
-          select: {
-            id: true,
+      const reviewerIds = await completionReviewerUserIds(prisma)
+      const submitterLabel =
+        (
+          await prisma.user.findUnique({
+            where: { id: user.userId },
+            select: { name: true, email: true },
+          })
+        )?.name ||
+        user.email ||
+        'Assignee'
+      const fullCompletion =
+        task.submissionMode === 'SINGLE' || allInternalAssigneesSubmitted
+      const notifyMessage = fullCompletion
+        ? `Dispatch completed and awaiting acknowledgment: ${task.recordNumber}`
+        : `Dispatch ${task.recordNumber}: submission from ${submitterLabel} is ready for review.`
+      for (const reviewerId of reviewerIds) {
+        if (reviewerId === user.userId) {
+          continue
+        }
+        await prisma.notification.create({
+          data: {
+            userId: reviewerId,
+            taskId: task.id,
+            type: 'TASK_UPDATED',
+            message: notifyMessage,
           },
         })
-
-        for (const director of directors) {
-          await prisma.notification.create({
-            data: {
-              userId: director.id,
-              taskId: task.id,
-              type: 'TASK_UPDATED',
-              message: `Task completed and awaiting acknowledgment: ${task.recordNumber}`,
-            },
-          })
-        }
       }
+    } else if (actionType === 'ADD_INFO') {
+      await prisma.taskHistory.create({
+        data: {
+          taskId: task.id,
+          action: 'TASK_INFO_ADDED',
+          newValue: JSON.stringify({
+            addedBy: user.userId,
+          }),
+          changedById: user.userId,
+        },
+      })
     } else if (actionType === 'ACKNOWLEDGED') {
       const targetSubmission = await prisma.taskSubmission.findUnique({
         where: {

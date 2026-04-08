@@ -46,6 +46,7 @@ RUN mkdir -p /app/public/uploads/tasks && \
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV PRISMA_MIGRATION_MODE=deploy
 
 ENTRYPOINT ["sh", "/app/docker/entrypoint.sh"]
 CMD ["npm", "run", "start"]

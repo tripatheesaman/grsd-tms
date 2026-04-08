@@ -33,6 +33,7 @@ enum TaskActionType {
   ASSIGNED
   FORWARDED
   SUBMITTED
+  ADD_INFO
   CLOSED
   REVERTED
   EDITED
@@ -52,6 +53,12 @@ enum TaskSubmissionStatus {
   SUBMITTED
   ACKNOWLEDGED
   REJECTED
+  FORWARDED
+}
+
+enum TaskSubmissionMode {
+  SINGLE
+  MULTIPLE
 }
 
 enum ReceiveStatus {
@@ -112,6 +119,7 @@ model Task {
   id                      String            @id @default(uuid())
   recordNumber            String            @unique
   fileNumber              String?
+  submissionMode          TaskSubmissionMode @default(MULTIPLE)
   issuanceDate            DateTime          @default(now())
   issuanceMessage         String?           @db.Text
   descriptionOfWork       String            @db.Text
@@ -246,6 +254,9 @@ model TaskAssignment {
   id        String   @id @default(uuid())
   taskId    String
   userId    String
+  isOriginal Boolean  @default(false)
+  isCc      Boolean   @default(false)
+  originalAssigneeId String?
   createdAt DateTime @default(now())
 
   
@@ -255,6 +266,9 @@ model TaskAssignment {
   @@unique([taskId, userId])
   @@index([taskId])
   @@index([userId])
+  @@index([isOriginal])
+  @@index([isCc])
+  @@index([originalAssigneeId])
 }
 
 model TaskSubmission {

@@ -25,7 +25,11 @@ export default async function TaskDetailsPage({
         select: { id: true, name: true, email: true },
       },
       assignments: {
-        include: {
+        select: {
+          userId: true,
+          isOriginal: true,
+          isCc: true,
+          originalAssigneeId: true,
           user: {
             select: { id: true, name: true, email: true },
           },
@@ -119,6 +123,21 @@ export default async function TaskDetailsPage({
     notFound()
   }
 
+  const superadmins = await prisma.user.findMany({
+    where: { role: 'SUPERADMIN' },
+    select: { id: true, email: true },
+  })
+  const forwardBlockUserIds = [
+    ...new Set([task.createdById, ...superadmins.map((u) => u.id)]),
+  ]
+  const forwardBlockEmails = [
+    ...new Set(
+      [task.createdBy?.email, ...superadmins.map((u) => u.email)]
+        .filter((e): e is string => Boolean(e))
+        .map((e) => e.toLowerCase())
+    ),
+  ]
+
   const canViewAll =
     currentUser.role === 'SUPERADMIN' ||
     currentUser.role === 'DIRECTOR' ||
@@ -197,6 +216,8 @@ export default async function TaskDetailsPage({
     <TaskDetailsClient
       task={filteredTask as any}
       currentUser={currentUser as any}
+      forwardBlockUserIds={forwardBlockUserIds}
+      forwardBlockEmails={forwardBlockEmails}
     />
   )
 }

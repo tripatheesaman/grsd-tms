@@ -9,7 +9,13 @@ import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
 import { LoadingSpinner } from '@/components/ui/Loading'
-import { formatDate, calculateDaysUntilDeadline, stripHtml, truncateText } from '@/lib/utils'
+import {
+  formatDate,
+  formatStoredDeadlineDate,
+  daysUntilStoredDeadline,
+  stripHtml,
+  truncateText,
+} from '@/lib/utils'
 import { Task, TaskStatus, UserRole } from '@/types'
 import { withBasePath } from '@/lib/base-path'
 
@@ -444,7 +450,7 @@ export default function TasksPage() {
               task.status !== 'CLOSED' &&
               (isAdminViewer || isCurrentAssignee)
             const daysLeft = showDeadline
-              ? calculateDaysUntilDeadline(task.assignedCompletionDate)
+              ? daysUntilStoredDeadline(task.assignedCompletionDate)
               : 0
             const isNotice = task.isNotice
             const submissionProgress = (() => {
@@ -587,7 +593,7 @@ export default function TasksPage() {
                         {!isNotice && (
                           <>
                             <span>
-                              Due: {formatDate(task.assignedCompletionDate)}
+                              Due: {formatStoredDeadlineDate(task.assignedCompletionDate)}
                             </span>
                             {showDeadline ? (
                               daysLeft >= 0 ? (

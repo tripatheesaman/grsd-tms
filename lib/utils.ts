@@ -39,6 +39,34 @@ export function calculateDaysUntilDeadline(deadline: Date | string): number {
   return diffDays
 }
 
+const STORED_DEADLINE_MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const
+
+export function formatStoredDeadlineDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  return `${STORED_DEADLINE_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`
+}
+
+export function daysUntilStoredDeadline(deadline: Date | string): number {
+  const d = typeof deadline === 'string' ? new Date(deadline) : deadline
+  const endUtc = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  const n = new Date()
+  const startUtc = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate())
+  return Math.ceil((endUtc - startUtc) / (1000 * 60 * 60 * 24))
+}
+
 export function sanitizeInput(input: string): string {
   return input.trim().replace(/[<>]/g, '')
 }

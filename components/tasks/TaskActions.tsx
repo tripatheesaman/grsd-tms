@@ -26,6 +26,8 @@ interface TaskActionsProps {
     canApproveCompletions?: boolean
     canRevertCompletions?: boolean
   }
+  forwardBlockUserIds?: string[]
+  forwardBlockEmails?: string[]
 }
 
 interface User {
@@ -34,10 +36,15 @@ interface User {
   name: string
 }
 
-export function TaskActions({ task, currentUser }: TaskActionsProps) {
+export function TaskActions({
+  task,
+  currentUser,
+  forwardBlockUserIds = [],
+  forwardBlockEmails = [],
+}: TaskActionsProps) {
   const router = useRouter()
   const toast = useToast()
-  const [actionModal, setActionModal] = useState<'submit' | 'forward' | 'close' | 'reject' | null>(null)
+  const [actionModal, setActionModal] = useState<'submit' | 'forward' | 'addInfo' | 'close' | 'reject' | null>(null)
   const [confirmModal, setConfirmModal] = useState<'revert' | 'acknowledge' | null>(null)
   const [loading, setLoading] = useState(false)
   const [description, setDescription] = useState('')
@@ -50,6 +57,12 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
     task.assignedToId === currentUser.id ||
     (Array.isArray((task as any).assignments) &&
       (task as any).assignments.some((assignment: any) => assignment.userId === currentUser.id))
+  const myAssignment = Array.isArray((task as any).assignments)
+    ? (task as any).assignments.find((assignment: any) => assignment.userId === currentUser.id)
+    : null
+  const isOriginalAssigneeToMe =
+    Boolean(myAssignment?.isOriginal)
+  const isCcOnly = Boolean(myAssignment?.isCc)
   const canClose = canCloseTask(currentUser.role)
   const canRevert =
     canRevertTask(currentUser.role, currentUser.canRevertCompletions) &&
@@ -66,13 +79,27 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
   const mySubmission = (task as any).submissions?.find(
     (submission: any) => submission.userId === currentUser.id
   )
+  const isCurrentPrimaryAssignee = task.assignedToId === currentUser.id
+  const submissionAllowsSubmit =
+    !mySubmission ||
+    mySubmission.status === 'PENDING' ||
+    mySubmission.status === 'REJECTED' ||
+    (mySubmission.status === 'FORWARDED' && isCurrentPrimaryAssignee)
   const canSubmitNow =
-    isAssignedToMe &&
+    isOriginalAssigneeToMe &&
     task.status !== 'CLOSED' &&
     task.status !== 'COMPLETED' &&
-    (!mySubmission ||
-      mySubmission.status === 'PENDING' ||
-      mySubmission.status === 'REJECTED')
+    submissionAllowsSubmit
+  const canForwardNow =
+    isAssignedToMe &&
+    !isCcOnly &&
+    (task.submissionMode !== 'SINGLE' || isOriginalAssigneeToMe) &&
+    task.status !== 'CLOSED' &&
+    !(task.status === 'COMPLETED' && !task.acknowledgedById)
+  const canAddInfoNow =
+    isCcOnly &&
+    task.status !== 'CLOSED' &&
+    !(task.status === 'COMPLETED' && !task.acknowledgedById)
 
   const handleSubmit = async () => {
     if (!description.trim() && !selectedFile) {
@@ -118,12 +145,30 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
       return
     }
 
+    const forwardTarget = selectedUsers[0]
+    const blockedEmail = (forwardTarget.email || '').trim().toLowerCase()
+    if (
+      blockedEmail &&
+      forwardBlockEmails.some((e) => e === blockedEmail)
+    ) {
+      toast.error('You cannot forward this dispatch to its creator or a superadmin.')
+      return
+    }
+    if (
+      forwardTarget.id &&
+      !forwardTarget.id.startsWith('external-') &&
+      forwardBlockUserIds.includes(forwardTarget.id)
+    ) {
+      toast.error('You cannot forward this dispatch to its creator or a superadmin.')
+      return
+    }
+
     setLoading(true)
     try {
       const formData = new FormData()
       formData.append('actionType', 'FORWARDED')
       formData.append('description', description)
-      const user = selectedUsers[0]
+      const user = forwardTarget
       if (user.id.startsWith('external-email:')) {
         formData.append('forwardedToEmail', user.email)
       } else if (user.id.startsWith('external-name:')) {
@@ -151,6 +196,39 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
       }
 
       toast.success('Task forwarded successfully!')
+      setActionModal(null)
+      resetForm()
+      router.refresh()
+    } catch (error) {
+      toast.error('An error occurred. Please try again.')
+      setLoading(false)
+    }
+  }
+
+  const handleAddInfo = async () => {
+    if (!description.trim() && !selectedFile) {
+      toast.error('Please provide information or upload a file')
+      return
+    }
+    setLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('actionType', 'ADD_INFO')
+      formData.append('description', description)
+      if (selectedFile) {
+        formData.append('file', selectedFile)
+      }
+      const response = await fetch(withBasePath(`/api/tasks/${task.id}/actions`), {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to add info')
+        setLoading(false)
+        return
+      }
+      toast.success('Information added successfully!')
       setActionModal(null)
       resetForm()
       router.refresh()
@@ -316,22 +394,36 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           {canSubmitNow && (
-            <>
-              <Button
-                variant="primary"
-                className="w-full"
-                onClick={() => setActionModal('submit')}
-              >
-                Submit Work
-              </Button>
+            <Button
+              variant="primary"
+              className="w-full h-11 text-sm font-semibold"
+              onClick={() => setActionModal('submit')}
+            >
+              Submit Work
+            </Button>
+          )}
+          {canForwardNow && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs text-blue-700 mb-2 font-medium">
+                Hand over this dispatch to another user.
+              </p>
               <Button
                 variant="outline"
-                className="w-full"
+                className="w-full h-11 text-sm font-semibold border-blue-300 text-blue-700 hover:bg-blue-100"
                 onClick={() => setActionModal('forward')}
               >
-                Forward Task
+                Forward Dispatch
               </Button>
-            </>
+            </div>
+          )}
+          {canAddInfoNow && (
+            <Button
+              variant="outline"
+              className="w-full h-11 text-sm font-semibold"
+              onClick={() => setActionModal('addInfo')}
+            >
+              Suggest / Add Info
+            </Button>
           )}
           {isAssignedToMe &&
             (mySubmission?.status === 'SUBMITTED' ||
@@ -457,6 +549,8 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
             selectedUsers={selectedUsers}
             onUsersChange={setSelectedUsers}
             allowExternal={true}
+            excludeUserIds={forwardBlockUserIds}
+            excludeEmails={forwardBlockEmails}
           />
           <RichTextEditor
             label="Description (Optional)"
@@ -476,6 +570,49 @@ export function TaskActions({ task, currentUser }: TaskActionsProps) {
               className="flex-1"
             >
               Forward
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setActionModal(null)
+                resetForm()
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={actionModal === 'addInfo'}
+        onClose={() => {
+          setActionModal(null)
+          resetForm()
+        }}
+        title="Suggest / Add Info"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <RichTextEditor
+            label="Information"
+            value={description}
+            onChange={setDescription}
+            placeholder="Add your suggestion, notes, or supporting information..."
+          />
+          <FileUpload
+            label="Attachment (Optional)"
+            onFileSelect={setSelectedFile}
+          />
+          <div className="flex gap-3 pt-4">
+            <Button
+              onClick={handleAddInfo}
+              isLoading={loading}
+              disabled={loading}
+              className="flex-1"
+            >
+              Add Info
             </Button>
             <Button
               variant="outline"
