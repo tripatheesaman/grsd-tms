@@ -37,6 +37,7 @@ export type TaskActionType =
   | 'ASSIGNED'
   | 'FORWARDED'
   | 'SUBMITTED'
+  | 'ADD_INFO'
   | 'CLOSED'
   | 'REVERTED'
   | 'EDITED'
@@ -44,7 +45,8 @@ export type TaskActionType =
   | 'REJECTED'
 export type NotificationType = 'TASK_ASSIGNED' | 'TASK_FORWARDED' | 'TASK_CLOSED' | 'TASK_UPDATED'
 export type ReceiveStatus = 'OPEN' | 'ASSIGNED' | 'CLOSED'
-export type TaskSubmissionStatus = 'PENDING' | 'SUBMITTED' | 'ACKNOWLEDGED' | 'REJECTED'
+export type TaskSubmissionStatus = 'PENDING' | 'SUBMITTED' | 'ACKNOWLEDGED' | 'REJECTED' | 'FORWARDED'
+export type TaskSubmissionMode = 'SINGLE' | 'MULTIPLE'
 
 export interface User {
   id: string
@@ -76,6 +78,7 @@ export interface Task {
   id: string
   recordNumber: string
   fileNumber?: string | null
+  submissionMode?: TaskSubmissionMode
   issuanceDate: Date
   issuanceMessage?: string | null
   descriptionOfWork: string

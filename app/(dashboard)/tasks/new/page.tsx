@@ -26,6 +26,7 @@ export default function NewTaskPage() {
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     fileNumber: '',
+    submissionMode: 'SINGLE' as 'SINGLE' | 'MULTIPLE',
     issuanceMessage: '',
     descriptionOfWork: '',
     priorityId: '',
@@ -319,6 +320,7 @@ export default function NewTaskPage() {
       const formDataToSend = new FormData()
       formDataToSend.append('issuanceMessage', formData.issuanceMessage)
       formDataToSend.append('fileNumber', formData.fileNumber.trim())
+      formDataToSend.append('submissionMode', formData.submissionMode)
       formDataToSend.append('descriptionOfWork', formData.descriptionOfWork)
       formDataToSend.append('priorityId', formData.priorityId)
       formDataToSend.append('complexityId', formData.complexityId)
@@ -449,6 +451,25 @@ export default function NewTaskPage() {
                 />
                 <span className="text-sm font-medium text-gray-700">
                   This is a notice (will be sent to all selected users and marked as closed)
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={formData.submissionMode === 'MULTIPLE'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      submissionMode: e.target.checked ? 'MULTIPLE' : 'SINGLE',
+                    })
+                  }
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Multiple assignees must submit separately
                 </span>
               </label>
             </div>

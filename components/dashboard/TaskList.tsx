@@ -4,7 +4,12 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { formatDate, calculateDaysUntilDeadline, stripHtml, truncateText } from '@/lib/utils'
+import {
+  formatStoredDeadlineDate,
+  daysUntilStoredDeadline,
+  stripHtml,
+  truncateText,
+} from '@/lib/utils'
 import { Task, TaskStatus } from '@/types'
 
 interface TaskListProps {
@@ -91,7 +96,7 @@ export function TaskList({ tasks, title, emptyMessage = 'No dispatches found' }:
             const showDeadline =
               task.status !== 'COMPLETED' && task.status !== 'CLOSED'
             const daysLeft = showDeadline
-              ? calculateDaysUntilDeadline(task.assignedCompletionDate)
+              ? daysUntilStoredDeadline(task.assignedCompletionDate)
               : 0
             const isOverdue = showDeadline && daysLeft < 0
             const isUrgent = showDeadline && daysLeft <= 3 && !isOverdue
@@ -233,7 +238,7 @@ export function TaskList({ tasks, title, emptyMessage = 'No dispatches found' }:
                         <span className="text-blue-600 font-medium">📌 Notice</span>
                       ) : showDeadline ? (
                         <div className="flex items-center gap-3">
-                          <span>Due: {formatDate(task.assignedCompletionDate)}</span>
+                          <span>Due: {formatStoredDeadlineDate(task.assignedCompletionDate)}</span>
                           <span
                             className={`font-medium ${
                               isOverdue

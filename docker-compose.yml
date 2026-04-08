@@ -23,6 +23,8 @@ services:
     container_name: grsd-tms-app
     env_file:
       - ./config/.env.production
+    environment:
+      PRISMA_MIGRATION_MODE: deploy
     depends_on:
       db:
         condition: service_healthy

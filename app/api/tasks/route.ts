@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
 import { getNextDispatchRecordNumber } from '@/lib/sequences'
 import { sendTaskNotificationEmail, sendNoticeEmail } from '@/lib/email'
 import { saveFile } from '@/lib/storage'
@@ -60,19 +61,7 @@ export async function GET(request: NextRequest) {
           },
         ],
       })
-      andConditions.push({
-        OR: [
-          { submissions: { none: { userId: user.userId } } },
-          {
-            submissions: {
-              some: {
-                userId: user.userId,
-                status: { in: ['PENDING', 'REJECTED'] },
-              },
-            },
-          },
-        ],
-      })
+      andConditions.push(dueTasksSubmissionOrClause(user.userId))
     } else if (assignedTo === 'unassigned') {
       andConditions.push({ assignedToId: null })
     } else if (assignedTo) {
@@ -225,8 +214,18 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    const accessUser = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: {
+        role: true,
+        canApproveCompletions: true,
+      },
+    })
+    const role = accessUser?.role ?? user.role
     const canViewAll =
-      user.role === 'SUPERADMIN' || user.role === 'DIRECTOR'
+      role === 'SUPERADMIN' ||
+      role === 'DIRECTOR' ||
+      accessUser?.canApproveCompletions === true
 
     if (!canViewAll) {
       andConditions.push({
@@ -390,6 +389,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const issuanceMessage = formData.get('issuanceMessage') as string
     const fileNumber = formData.get('fileNumber') as string
+    const submissionModeRaw = formData.get('submissionMode') as string
     const descriptionOfWork = formData.get('descriptionOfWork') as string
     const assignedToIds = formData.get('assignedToIds') as string 
     const priorityId = formData.get('priorityId') as string
@@ -400,6 +400,7 @@ export async function POST(request: NextRequest) {
     const isNotice = formData.get('isNotice') === 'true'
     const receiveId = formData.get('receiveId') as string | null
     const file = formData.get('file') as File | null
+    const submissionMode = submissionModeRaw === 'SINGLE' ? 'SINGLE' : 'MULTIPLE'
 
     
     
@@ -664,6 +665,7 @@ export async function POST(request: NextRequest) {
         data: {
           recordNumber,
           fileNumber: fileNumber.trim(),
+          submissionMode,
           issuanceMessage: issuanceMessage || null,
           descriptionOfWork,
           assignedToId,
@@ -697,6 +699,9 @@ export async function POST(request: NextRequest) {
             data: {
               taskId: task.id,
               userId: assignee.userId,
+              isOriginal: true,
+              isCc: false,
+              originalAssigneeId: assignee.userId,
             },
           })
           await prisma.taskSubmission.create({
@@ -794,6 +799,7 @@ export async function POST(request: NextRequest) {
         data: {
           recordNumber,
           fileNumber: fileNumber.trim(),
+          submissionMode,
           issuanceMessage: issuanceMessage || null,
           descriptionOfWork,
           assignedToId,
@@ -828,17 +834,31 @@ export async function POST(request: NextRequest) {
 
       for (const assignee of internalAssignees) {
         if (assignee.userId) {
+          const isPrimary = assignee.userId === assignedToId
+          const isOriginal = submissionMode === 'MULTIPLE' ? true : isPrimary
+          const isCc = submissionMode === 'MULTIPLE' ? false : !isPrimary
           await prisma.taskAssignment.create({
             data: {
               taskId: task.id,
               userId: assignee.userId,
+              isOriginal,
+              isCc,
+              originalAssigneeId:
+                submissionMode === 'MULTIPLE'
+                  ? assignee.userId
+                  : assignedToId || null,
             },
           })
           await prisma.taskSubmission.create({
             data: {
               taskId: task.id,
               userId: assignee.userId,
-              status: 'PENDING',
+              status:
+                submissionMode === 'MULTIPLE'
+                  ? 'PENDING'
+                  : isPrimary
+                  ? 'PENDING'
+                  : 'FORWARDED',
             },
           })
         }

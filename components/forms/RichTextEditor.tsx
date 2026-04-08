@@ -4,7 +4,24 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import TextAlign from '@tiptap/extension-text-align'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+
+function normalizeEditorHtml(html: string): string {
+  const s = (html || '').trim()
+  if (
+    s === '' ||
+    s === '<p></p>' ||
+    s === '<p><br></p>' ||
+    s === '<p><br class="ProseMirror-trailingBreak"></p>'
+  ) {
+    return ''
+  }
+  return html
+}
+
+function htmlEquivalent(a: string, b: string): boolean {
+  return normalizeEditorHtml(a) === normalizeEditorHtml(b)
+}
 
 interface RichTextEditorProps {
   value: string
@@ -21,6 +38,9 @@ export function RichTextEditor({
   label,
   error,
 }: RichTextEditorProps) {
+  const valueRef = useRef(value)
+  valueRef.current = value
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -41,7 +61,11 @@ export function RichTextEditor({
     ],
     content: value,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+      const next = editor.getHTML()
+      if (htmlEquivalent(next, valueRef.current)) {
+        return
+      }
+      onChange(next)
     },
     editorProps: {
       attributes: {
@@ -52,9 +76,14 @@ export function RichTextEditor({
   })
 
   useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value)
+    if (!editor) {
+      return
     }
+    const current = editor.getHTML()
+    if (htmlEquivalent(value, current)) {
+      return
+    }
+    editor.commands.setContent(value === '' ? '' : value, { emitUpdate: false })
   }, [value, editor])
 
   if (!editor) {

@@ -17,10 +17,20 @@ interface UserSelectorProps {
   allowExternal?: boolean
   label?: string
   error?: string
+  excludeUserIds?: string[]
+  excludeEmails?: string[]
 }
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ALL_STAFF_TOKEN = 'allstaff'
+const EMPTY_STRING_ARRAY: string[] = []
+
+function normalizeExcludedEmails(excludeEmails?: string[]) {
+  if (!excludeEmails?.length) return new Set<string>()
+  return new Set(
+    excludeEmails.map((e) => e.trim().toLowerCase()).filter((e) => Boolean(e))
+  )
+}
 
 export function UserSelector({
   selectedUsers,
@@ -28,15 +38,29 @@ export function UserSelector({
   allowExternal = true,
   label,
   error,
+  excludeUserIds,
+  excludeEmails,
 }: UserSelectorProps) {
   const [inputValue, setInputValue] = useState('')
   const [suggestions, setSuggestions] = useState<User[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const excludeUserIdsRef = useRef<string[]>(EMPTY_STRING_ARRAY)
+  const excludeEmailsRef = useRef<string[]>(EMPTY_STRING_ARRAY)
+  excludeUserIdsRef.current = excludeUserIds?.length ? excludeUserIds : EMPTY_STRING_ARRAY
+  excludeEmailsRef.current = excludeEmails?.length ? excludeEmails : EMPTY_STRING_ARRAY
 
   const addChip = (user: User) => {
     if (selectedUsers.some((u) => u.id === user.id)) {
+      return
+    }
+    const exIds = excludeUserIdsRef.current
+    const exEmails = excludeEmailsRef.current
+    if (exIds.includes(user.id)) {
+      return
+    }
+    if (user.email && normalizeExcludedEmails(exEmails).has(user.email.toLowerCase())) {
       return
     }
     onUsersChange([...selectedUsers, user])
@@ -70,9 +94,20 @@ export function UserSelector({
         const response = await fetch(withBasePath(`/api/users/search?q=${encodeURIComponent(inputValue)}`))
         if (response.ok) {
           const data = await response.json()
-          const filtered = data.users.filter(
-            (user: User) => !selectedUsers.some((su) => su.id === user.id)
-          )
+          const excludedIds = new Set(excludeUserIdsRef.current)
+          const excludedEmailSet = normalizeExcludedEmails(excludeEmailsRef.current)
+          const filtered = data.users.filter((user: User) => {
+            if (selectedUsers.some((su) => su.id === user.id)) {
+              return false
+            }
+            if (excludedIds.has(user.id)) {
+              return false
+            }
+            if (excludedEmailSet.has(user.email?.toLowerCase() ?? '')) {
+              return false
+            }
+            return true
+          })
           
           
           const allStaffAlreadySelected = selectedUsers.some(u => u.id === ALL_STAFF_TOKEN)
@@ -123,6 +158,9 @@ export function UserSelector({
 
     if (emailRegex.test(trimmed)) {
       const normalizedEmail = trimmed.toLowerCase()
+      if (normalizeExcludedEmails(excludeEmailsRef.current).has(normalizedEmail)) {
+        return
+      }
       addChip({
         id: `external-email:${normalizedEmail}`,
         email: normalizedEmail,

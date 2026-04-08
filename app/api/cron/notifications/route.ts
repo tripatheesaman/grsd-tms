@@ -132,6 +132,10 @@ export async function GET(request: NextRequest) {
       },
       include: {
         assignedTo: true,
+        assignments: {
+          where: { isCc: true },
+          include: { user: true },
+        },
         createdBy: {
           select: { name: true },
         },
@@ -146,13 +150,23 @@ export async function GET(request: NextRequest) {
 
     let deadlineRemindersSent = 0
     for (const task of tasksDueSoon) {
-      if (task.assignedTo) {
-        try {
-          const daysLeft = Math.ceil(
-            (task.assignedCompletionDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
-          )
-
-          await sendTaskNotificationEmail(task.assignedTo.email, {
+      try {
+        const daysLeft = Math.ceil(
+          (task.assignedCompletionDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
+        )
+        const recipients = new Map<string, { email: string }>()
+        if (task.assignedTo?.email) {
+          recipients.set(task.assignedTo.id, { email: task.assignedTo.email })
+        }
+        if (task.submissionMode === 'SINGLE' && Array.isArray((task as any).assignments)) {
+          ;(task as any).assignments.forEach((assignment: any) => {
+            if (assignment?.user?.id && assignment?.user?.email) {
+              recipients.set(assignment.user.id, { email: assignment.user.email })
+            }
+          })
+        }
+        for (const recipient of recipients.values()) {
+          await sendTaskNotificationEmail(recipient.email, {
             recordNumber: task.recordNumber,
             issuanceMessage: `⏰ DEADLINE REMINDER: This task is due in ${daysLeft} day(s)! Please complete it soon.`,
             descriptionOfWork: task.descriptionOfWork,
@@ -162,24 +176,23 @@ export async function GET(request: NextRequest) {
             creatorName: task.createdBy?.name || 'System',
             taskId: task.id,
           })
-
-          
-          await prisma.task.update({
-            where: { id: task.id },
-            data: { lastDeadlineReminder: now },
-          })
-
-          deadlineRemindersSent++
-          logger.info('Sent deadline reminder email', {
-            taskId: task.id,
-            userId: task.assignedToId,
-            daysLeft,
-          })
-        } catch (error) {
-          logger.error('Error sending deadline reminder email', error, {
-            taskId: task.id,
-          })
         }
+
+        await prisma.task.update({
+          where: { id: task.id },
+          data: { lastDeadlineReminder: now },
+        })
+
+        deadlineRemindersSent++
+        logger.info('Sent deadline reminder email', {
+          taskId: task.id,
+          userId: task.assignedToId,
+          daysLeft,
+        })
+      } catch (error) {
+        logger.error('Error sending deadline reminder email', error, {
+          taskId: task.id,
+        })
       }
     }
 

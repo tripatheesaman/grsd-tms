@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
 import { TaskList } from '@/components/dashboard/TaskList'
 
 export default async function DueTasksPage() {
@@ -9,7 +10,7 @@ export default async function DueTasksPage() {
     redirect('/login')
   }
 
-  const tasks = await prisma.task.findMany({
+  const tasksRaw = await prisma.task.findMany({
     where: {
       status: {
         in: ['ACTIVE', 'IN_PROGRESS'],
@@ -22,21 +23,7 @@ export default async function DueTasksPage() {
           },
         },
       ],
-      AND: [
-        {
-          OR: [
-            { submissions: { none: { userId: user.userId } } },
-            {
-              submissions: {
-                some: {
-                  userId: user.userId,
-                  status: { in: ['PENDING', 'REJECTED'] },
-                },
-              },
-            },
-          ],
-        },
-      ],
+      AND: [dueTasksSubmissionOrClause(user.userId)],
     },
     include: {
       createdBy: {
@@ -50,6 +37,21 @@ export default async function DueTasksPage() {
       assignedCompletionDate: 'asc',
     },
   })
+
+  const priorityIds = [...new Set(tasksRaw.map((t) => t.priorityId))]
+  const priorityRows =
+    priorityIds.length > 0
+      ? await prisma.priority.findMany({
+          where: { id: { in: priorityIds } },
+          select: { id: true, name: true, order: true },
+        })
+      : []
+  const priorityById = new Map(priorityRows.map((p) => [p.id, p]))
+
+  const tasks = tasksRaw.map((t) => ({
+    ...t,
+    priority: priorityById.get(t.priorityId) ?? null,
+  }))
 
   return (
     <div className="space-y-6">
