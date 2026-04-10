@@ -346,8 +346,6 @@ model AppConfig {
   dispatchStartNumber Int      @default(1)
   receiveStartNumber  Int      @default(1)
   masterfileStartNumber Int    @default(1)
-  /// Highest allowed sequence number for masterfile in the current FY (null = no limit).
-  masterfileMaxTotal  Int?
   smtpHost            String?
   smtpPort            Int?
   smtpSecure          Boolean  @default(false)

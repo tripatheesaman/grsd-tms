@@ -8,7 +8,6 @@ import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
 import {
   getNextDispatchRecordNumber,
   getNextMasterfileRecord,
-  MasterfileSequenceExhaustedError,
 } from '@/lib/sequences'
 import { sendTaskNotificationEmail, sendNoticeEmail } from '@/lib/email'
 import { saveFile } from '@/lib/storage'
@@ -999,14 +998,6 @@ export async function POST(request: NextRequest) {
       tasks: createdTasks, 
     }, { status: 201 })
   } catch (error) {
-    if (error instanceof MasterfileSequenceExhaustedError) {
-      return NextResponse.json(
-        {
-          error: `Masterfile number limit for this fiscal year (${error.maxTotal}) has been reached. Raise the maximum in System Settings if appropriate.`,
-        },
-        { status: 409 }
-      )
-    }
     logger.error('Error creating task', error)
     return NextResponse.json(
       { error: 'Internal server error' },
