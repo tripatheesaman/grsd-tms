@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
         dispatchStartNumber: config.dispatchStartNumber,
         receiveStartNumber: config.receiveStartNumber,
         masterfileStartNumber: config.masterfileStartNumber,
-        masterfileMaxTotal: config.masterfileMaxTotal,
         smtpHost: config.smtpHost || '',
         smtpPort: config.smtpPort || 587,
         smtpSecure: config.smtpSecure,
@@ -70,7 +69,6 @@ export async function PATCH(request: NextRequest) {
       dispatchStartNumber,
       receiveStartNumber,
       masterfileStartNumber,
-      masterfileMaxTotal,
       smtpHost,
       smtpPort,
       smtpSecure,
@@ -108,44 +106,12 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    let resolvedMasterfileMaxTotal: number | null
-    if (Object.prototype.hasOwnProperty.call(body, 'masterfileMaxTotal')) {
-      if (masterfileMaxTotal === undefined || masterfileMaxTotal === null || masterfileMaxTotal === '') {
-        resolvedMasterfileMaxTotal = null
-      } else {
-        const n = Number(masterfileMaxTotal)
-        if (!Number.isInteger(n) || n < 1) {
-          return NextResponse.json(
-            { error: 'Masterfile maximum total must be a positive integer or empty' },
-            { status: 400 }
-          )
-        }
-        resolvedMasterfileMaxTotal = n
-      }
-    } else {
-      resolvedMasterfileMaxTotal =
-        typeof ensuredConfig.masterfileMaxTotal === 'number' ? ensuredConfig.masterfileMaxTotal : null
-    }
-
-    if (
-      resolvedMasterfileMaxTotal !== null &&
-      resolvedMasterfileMaxTotal < effectiveMasterfileStart
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'Masterfile maximum total must be greater than or equal to the masterfile start number',
-        },
-        { status: 400 }
-      )
-    }
 
     const updateData: any = {
       currentFy: ensuredConfig.currentFy,
       dispatchStartNumber,
       receiveStartNumber,
       masterfileStartNumber: effectiveMasterfileStart,
-      masterfileMaxTotal: resolvedMasterfileMaxTotal,
       smtpHost: smtpHost?.trim() || null,
       smtpPort: smtpPort ? Number(smtpPort) : null,
       smtpSecure: Boolean(smtpSecure),
@@ -174,7 +140,6 @@ export async function PATCH(request: NextRequest) {
         dispatchStartNumber: updated.dispatchStartNumber,
         receiveStartNumber: updated.receiveStartNumber,
         masterfileStartNumber: updated.masterfileStartNumber,
-        masterfileMaxTotal: updated.masterfileMaxTotal,
         smtpHost: updated.smtpHost || '',
         smtpPort: updated.smtpPort || 587,
         smtpSecure: updated.smtpSecure,

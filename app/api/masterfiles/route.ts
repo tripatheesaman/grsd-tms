@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { getNextMasterfileRecord, MasterfileSequenceExhaustedError } from '@/lib/sequences'
+import { getNextMasterfileRecord } from '@/lib/sequences'
 import { getFileUrl, saveFile } from '@/lib/storage'
 import { canViewAllTasksAndProgress } from '@/lib/task-visibility'
 
@@ -229,14 +229,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    if (error instanceof MasterfileSequenceExhaustedError) {
-      return NextResponse.json(
-        {
-          error: `Masterfile number limit for this fiscal year (${error.maxTotal}) has been reached. Raise the maximum in System Settings if appropriate.`,
-        },
-        { status: 409 }
-      )
-    }
     logger.error('Error creating masterfile request', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

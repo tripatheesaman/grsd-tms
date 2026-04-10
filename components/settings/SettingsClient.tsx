@@ -13,7 +13,6 @@ interface SettingsClientProps {
     dispatchStartNumber: number
     receiveStartNumber: number
     masterfileStartNumber: number
-    masterfileMaxTotal: number | null
     smtpHost: string
     smtpPort: number
     smtpSecure: boolean
@@ -132,30 +131,10 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
                 }))
               }
             />
-            <Input
-              label="Masterfile Maximum Total (optional)"
-              type="number"
-              min={1}
-              value={
-                settings.masterfileMaxTotal === null || settings.masterfileMaxTotal === undefined
-                  ? ''
-                  : String(settings.masterfileMaxTotal)
-              }
-              onChange={(e) => {
-                const raw = e.target.value.trim()
-                setSettings((prev) => ({
-                  ...prev,
-                  masterfileMaxTotal: raw === '' ? null : Math.max(1, Number(raw)),
-                }))
-              }}
-              placeholder="No limit"
-            />
           </div>
           <p className="text-sm text-gray-500">
             Number format: <strong>Dispatch</strong> = `D-FY-sequence`,{' '}
             <strong>Receive</strong> = `R-FY-sequence`, <strong>Masterfile</strong> = `MF-FY-sequence`.
-            Masterfile maximum total is the highest allowed sequence value for the current fiscal year
-            (leave blank for no limit).
           </p>
         </CardContent>
       </Card>
