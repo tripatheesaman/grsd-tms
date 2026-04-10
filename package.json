@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "prisma": "^6.19.0",
     "@tiptap/extension-link": "^3.10.7",
     "@tiptap/extension-text-align": "^3.10.7",
     "@tiptap/react": "^3.10.7",
@@ -51,7 +52,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
-    "prisma": "^6.19.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5"
