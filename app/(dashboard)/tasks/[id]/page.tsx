@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { TaskDetailsClient } from '@/components/tasks/TaskDetailsClient'
+import { canViewAllTasksAndProgress } from '@/lib/task-visibility'
 
 export default async function TaskDetailsPage({
   params,
@@ -123,7 +124,7 @@ export default async function TaskDetailsPage({
     notFound()
   }
 
-  const superadmins = await prisma.user.findMany({
+  const superadmins: { id: string; email: string }[] = await prisma.user.findMany({
     where: { role: 'SUPERADMIN' },
     select: { id: true, email: true },
   })
@@ -139,9 +140,11 @@ export default async function TaskDetailsPage({
   ]
 
   const canViewAll =
-    currentUser.role === 'SUPERADMIN' ||
-    currentUser.role === 'DIRECTOR' ||
-    currentUser.canViewAllSubmissions === true ||
+    canViewAllTasksAndProgress({
+      role: currentUser.role,
+      canViewAllSubmissions: currentUser.canViewAllSubmissions,
+      canApproveCompletions: currentUser.canApproveCompletions,
+    }) ||
     task.assignedToId === currentUser.id ||
     task.assignments.some((assignment: any) => assignment.userId === currentUser.id)
 

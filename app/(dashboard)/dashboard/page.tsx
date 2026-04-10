@@ -4,40 +4,16 @@ import { NotificationPanel } from '@/components/dashboard/NotificationPanel'
 import { TaskList } from '@/components/dashboard/TaskList'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
+import {
+  getDashboardContributorData,
+  getDashboardGlobalCounts,
+  getDashboardLeadershipData,
+  type ContributorData,
+  type LeadershipData,
+} from '@/lib/dashboard-queries'
 import { calculateDaysUntilDeadline, formatDate, stripHtml, truncateText } from '@/lib/utils'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { UserRole } from '@/types'
-
-interface LeadershipData {
-  watchlist: Array<{
-    id: string
-    recordNumber: string
-    descriptionOfWork: string
-    assignedCompletionDate: Date
-    assignedTo?: { name: string | null }
-    priority?: { name: string | null }
-    workcenter?: { name: string | null }
-    daysLeft: number
-  }>
-  acknowledgmentQueue: Array<{
-    id: string
-    recordNumber: string
-    updatedAt: Date
-    assignedTo?: { name: string | null }
-    priority?: { name: string | null }
-  }>
-  priorityBreakdown: Array<{ name: string; count: number }>
-  workcenterLoad: Array<{ name: string; count: number }>
-}
-
-interface ContributorData {
-  myBoardTasks: any[]
-  myOpenCount: number
-  myDueSoonCount: number
-  myCompletedWeekCount: number
-  noticeCount: number
-}
 
 export default async function DashboardPage() {
   const user = await getCurrentUser()
@@ -60,267 +36,22 @@ export default async function DashboardPage() {
   const canCreateTasks = userRole === 'SUPERADMIN' || userRecord.canCreateTasks
 
   const now = new Date()
-  const twoDaysOut = new Date(now)
-  twoDaysOut.setDate(twoDaysOut.getDate() + 2)
-  const startOfToday = new Date(now)
-  startOfToday.setHours(0, 0, 0, 0)
-  const weekAgo = new Date(now)
-  weekAgo.setDate(weekAgo.getDate() - 7)
 
-  const [activeCount, completedTodayCount, dueSoonCount, overdueCount, ackPendingCount] =
-    await Promise.all([
-      prisma.task.count({
-        where: { status: { in: ['ACTIVE', 'IN_PROGRESS'] } },
-      }),
-      prisma.task.count({
-        where: {
-          status: 'COMPLETED',
-          updatedAt: { gte: startOfToday },
-        },
-      }),
-      prisma.task.count({
-        where: {
-          status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-          assignedCompletionDate: {
-            gte: now,
-            lte: twoDaysOut,
-          },
-        },
-      }),
-      prisma.task.count({
-        where: {
-          status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-          assignedCompletionDate: { lt: now },
-        },
-      }),
-      prisma.task.count({
-        where: {
-          status: 'COMPLETED',
-          acknowledgedById: null,
-        },
-      }),
-    ])
+  const [
+    activeCount,
+    completedTodayCount,
+    dueSoonCount,
+    overdueCount,
+    ackPendingCount,
+  ] = await getDashboardGlobalCounts()
 
   let leadershipData: LeadershipData | null = null
   let contributorData: ContributorData | null = null
 
   if (isLeadership) {
-    const [
-      watchlistRaw,
-      acknowledgmentQueueRaw,
-      priorityGroupRaw,
-      workcenterGroupRaw,
-    ] =
-      await Promise.all([
-        prisma.task.findMany({
-          where: {
-            status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-          },
-          include: {
-            assignedTo: { select: { name: true } },
-            priority: { select: { name: true, order: true } },
-            workcenter: { select: { name: true } },
-          },
-          orderBy: { assignedCompletionDate: 'asc' },
-          take: 20,
-        }),
-        prisma.task.findMany({
-          where: {
-            status: 'COMPLETED',
-            acknowledgedById: null,
-          },
-          include: {
-            assignedTo: { select: { name: true } },
-            priority: { select: { name: true } },
-          },
-          orderBy: { updatedAt: 'asc' },
-          take: 6,
-        }),
-        prisma.task.groupBy({
-          by: ['priorityId'],
-          where: {
-            status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-          },
-          _count: { _all: true },
-        }),
-        prisma.task.groupBy({
-          by: ['workcenterId'],
-          where: {
-            status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-            workcenterId: { not: null },
-          },
-          _count: { _all: true },
-        }),
-      ])
-
-    const priorityGroup = [...priorityGroupRaw].sort(
-      (a, b) => (b._count?._all ?? 0) - (a._count?._all ?? 0)
-    )
-    const workcenterGroup = [...workcenterGroupRaw]
-      .sort((a, b) => (b._count?._all ?? 0) - (a._count?._all ?? 0))
-      .slice(0, 5)
-
-    const priorityIds = priorityGroup
-      .map((item) => item.priorityId)
-      .filter((id): id is string => Boolean(id))
-    const workcenterIds = workcenterGroup
-      .map((item) => item.workcenterId)
-      .filter((id): id is string => Boolean(id))
-
-    const [priorityMeta, workcenterMeta] = await Promise.all([
-      priorityIds.length
-        ? prisma.priority.findMany({
-            where: { id: { in: priorityIds } },
-            select: { id: true, name: true, order: true },
-          })
-        : Promise.resolve([]),
-      workcenterIds.length
-        ? prisma.workcenter.findMany({
-            where: { id: { in: workcenterIds } },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-    ])
-
-    const priorityLookup = new Map(priorityMeta.map((p) => [p.id, p]))
-    const workcenterLookup = new Map(workcenterMeta.map((wc) => [wc.id, wc.name]))
-
-    const priorityBreakdown = priorityGroup.map((entry) => ({
-      name: entry.priorityId
-        ? priorityLookup.get(entry.priorityId)?.name ?? 'Unspecified'
-        : 'Unspecified',
-      count: entry._count?._all ?? 0,
-    }))
-
-    const workcenterLoad = workcenterGroup.map((entry) => ({
-      name: workcenterLookup.get(entry.workcenterId!) ?? 'Unassigned',
-      count: entry._count?._all ?? 0,
-    }))
-
-    const watchlist = watchlistRaw
-      .map((task) => ({
-        id: task.id,
-        recordNumber: task.recordNumber,
-        descriptionOfWork: task.descriptionOfWork,
-        assignedCompletionDate: task.assignedCompletionDate,
-        assignedTo: task.assignedTo ? { name: task.assignedTo.name ?? null } : undefined,
-        priority: task.priority ? { name: task.priority.name ?? null } : undefined,
-        workcenter: task.workcenter ? { name: task.workcenter.name ?? null } : undefined,
-        daysLeft: calculateDaysUntilDeadline(task.assignedCompletionDate),
-      }))
-      .filter((task) => task.daysLeft <= 7)
-      .slice(0, 10)
-
-    leadershipData = {
-      watchlist,
-      acknowledgmentQueue: acknowledgmentQueueRaw.map((task) => ({
-        id: task.id,
-        recordNumber: task.recordNumber,
-        updatedAt: task.updatedAt,
-        assignedTo: task.assignedTo ? { name: task.assignedTo.name ?? null } : undefined,
-        priority: task.priority ? { name: task.priority.name ?? null } : undefined,
-      })),
-      priorityBreakdown,
-      workcenterLoad,
-    }
+    leadershipData = await getDashboardLeadershipData()
   } else {
-    const [myBoardTasksData, myOpenCount, myDueSoonCount, myCompletedWeekCount, noticeCount] =
-      await Promise.all([
-        prisma.task.findMany({
-          where: {
-            status: { not: 'CLOSED' },
-            OR: [
-              { assignedToId: user.userId },
-              {
-                assignments: {
-                  some: { userId: user.userId },
-                },
-              },
-            ],
-            AND: [dueTasksSubmissionOrClause(user.userId)],
-          },
-          include: {
-            assignedTo: { select: { id: true, name: true, email: true } },
-            assignments: {
-              include: { user: { select: { id: true, name: true, email: true } } },
-            },
-            actions: {
-              select: {
-                actionType: true,
-                performedById: true,
-              },
-            },
-            priority: { select: { id: true, name: true, order: true } },
-          },
-          orderBy: [
-            { isNotice: 'desc' },
-            { priority: { order: 'desc' } },
-            { assignedCompletionDate: 'asc' },
-          ],
-          take: 8,
-        }),
-        prisma.task.count({
-          where: {
-            status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-            OR: [
-              { assignedToId: user.userId },
-              {
-                assignments: {
-                  some: { userId: user.userId },
-                },
-              },
-            ],
-            AND: [dueTasksSubmissionOrClause(user.userId)],
-          },
-        }),
-        prisma.task.count({
-          where: {
-            status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-            assignedCompletionDate: {
-              gte: now,
-              lte: twoDaysOut,
-            },
-            OR: [
-              { assignedToId: user.userId },
-              {
-                assignments: {
-                  some: { userId: user.userId },
-                },
-              },
-            ],
-            AND: [dueTasksSubmissionOrClause(user.userId)],
-          },
-        }),
-        prisma.task.count({
-          where: {
-            status: 'COMPLETED',
-            assignedToId: user.userId,
-            updatedAt: { gte: weekAgo },
-          },
-        }),
-        prisma.task.count({
-          where: {
-            isNotice: true,
-            status: { not: 'CLOSED' },
-            OR: [
-              { assignedToId: user.userId },
-              {
-                assignments: {
-                  some: { userId: user.userId },
-                },
-              },
-            ],
-          },
-        }),
-      ])
-
-    contributorData = {
-      myBoardTasks: myBoardTasksData,
-      myOpenCount,
-      myDueSoonCount,
-      myCompletedWeekCount,
-      noticeCount,
-    }
+    contributorData = await getDashboardContributorData(user.userId)
   }
 
   const formatRoleTitle = (role: UserRole) => {

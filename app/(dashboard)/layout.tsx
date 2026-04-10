@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
+import { canViewAllTasksAndProgress } from '@/lib/task-visibility'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 
@@ -35,6 +36,7 @@ export default async function DashboardLayout({
         canApproveCompletions: true,
         canRevertCompletions: true,
         canViewReports: true,
+        canViewAllSubmissions: true,
       },
     })
 
@@ -47,24 +49,36 @@ export default async function DashboardLayout({
     redirect('/change-password')
   }
 
+  const orgTaskOversight = canViewAllTasksAndProgress({
+    role: userData.role,
+    canViewAllSubmissions: userData.canViewAllSubmissions,
+    canApproveCompletions: userData.canApproveCompletions,
+  })
+
   const [dueTaskCount, completionRequestCount] = await Promise.all([
     prisma.task.count({
-    where: {
-      status: {
-        in: ['ACTIVE', 'IN_PROGRESS'],
-      },
-      OR: [
-        { assignedToId: user.userId },
-        {
-          assignments: {
-            some: { userId: user.userId },
+      where: orgTaskOversight
+        ? {
+            status: {
+              in: ['ACTIVE', 'IN_PROGRESS'],
+            },
+          }
+        : {
+            status: {
+              in: ['ACTIVE', 'IN_PROGRESS'],
+            },
+            OR: [
+              { assignedToId: user.userId },
+              {
+                assignments: {
+                  some: { userId: user.userId },
+                },
+              },
+            ],
+            AND: [dueTasksSubmissionOrClause(user.userId)],
           },
-        },
-      ],
-      AND: [dueTasksSubmissionOrClause(user.userId)],
-    },
     }),
-    (userData.canApproveCompletions || userData.role === 'SUPERADMIN'
+    orgTaskOversight
       ? prisma.task.count({
           where: {
             OR: [
@@ -82,7 +96,7 @@ export default async function DashboardLayout({
             ],
           },
         })
-      : Promise.resolve(0)),
+      : Promise.resolve(0),
   ])
 
   return (
@@ -98,6 +112,7 @@ export default async function DashboardLayout({
         canManageSettings={userData.canManageSettings || false}
         canManageReceives={userData.canManageReceives || false}
         canApproveCompletions={userData.canApproveCompletions || false}
+        canViewAllSubmissions={userData.canViewAllSubmissions || false}
         canViewReports={userData.canViewReports || false}
         completionRequestCount={completionRequestCount}
       />

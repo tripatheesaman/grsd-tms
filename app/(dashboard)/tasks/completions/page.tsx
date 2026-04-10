@@ -17,6 +17,7 @@ export default async function CompletionRequestsPage() {
     select: {
       role: true,
       canApproveCompletions: true,
+      canViewAllSubmissions: true,
     },
   })
 
@@ -24,7 +25,9 @@ export default async function CompletionRequestsPage() {
     currentUser &&
     (currentUser.role === 'SUPERADMIN' ||
       currentUser.role === 'DIRECTOR' ||
-      currentUser.canApproveCompletions)
+      currentUser.role === 'DY_DIRECTOR' ||
+      currentUser.canApproveCompletions === true ||
+      currentUser.canViewAllSubmissions === true)
 
   if (!canReviewCompletions) {
     redirect('/dashboard')

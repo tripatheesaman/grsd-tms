@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
+import { canViewAllTasksAndProgress } from '@/lib/task-visibility'
 import { TaskList } from '@/components/dashboard/TaskList'
 
 export default async function DueTasksPage() {
@@ -10,21 +11,38 @@ export default async function DueTasksPage() {
     redirect('/login')
   }
 
-  const tasksRaw = await prisma.task.findMany({
-    where: {
-      status: {
-        in: ['ACTIVE', 'IN_PROGRESS'],
-      },
-      OR: [
-        { assignedToId: user.userId },
-        {
-          assignments: {
-            some: { userId: user.userId },
-          },
-        },
-      ],
-      AND: [dueTasksSubmissionOrClause(user.userId)],
+  const userRow = await prisma.user.findUnique({
+    where: { id: user.userId },
+    select: {
+      role: true,
+      canViewAllSubmissions: true,
+      canApproveCompletions: true,
     },
+  })
+  const orgWide =
+    userRow !== null && canViewAllTasksAndProgress(userRow)
+
+  const tasksRaw = await prisma.task.findMany({
+    where: orgWide
+      ? {
+          status: {
+            in: ['ACTIVE', 'IN_PROGRESS'],
+          },
+        }
+      : {
+          status: {
+            in: ['ACTIVE', 'IN_PROGRESS'],
+          },
+          OR: [
+            { assignedToId: user.userId },
+            {
+              assignments: {
+                some: { userId: user.userId },
+              },
+            },
+          ],
+          AND: [dueTasksSubmissionOrClause(user.userId)],
+        },
     include: {
       createdBy: {
         select: { id: true, name: true, email: true },
@@ -32,10 +50,22 @@ export default async function DueTasksPage() {
       assignedTo: {
         select: { id: true, name: true, email: true },
       },
+      assignments: {
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
+      actions: {
+        select: {
+          actionType: true,
+          performedById: true,
+        },
+      },
     },
     orderBy: {
       assignedCompletionDate: 'asc',
     },
+    take: orgWide ? 500 : undefined,
   })
 
   const priorityIds = [...new Set(tasksRaw.map((t) => t.priorityId))]
@@ -56,17 +86,22 @@ export default async function DueTasksPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Due Tasks</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {orgWide ? 'Due tasks (organization)' : 'Due Tasks'}
+        </h1>
         <p className="text-gray-600 mt-1">
-          Tasks where you are currently assigned.
+          {orgWide
+            ? 'All active and in-progress dispatches sorted by deadline.'
+            : 'Tasks where you are currently assigned.'}
         </p>
       </div>
       <TaskList
         tasks={tasks as any}
-        title="My Due Tasks"
-        emptyMessage="No assigned tasks found."
+        title={orgWide ? 'Organization due list' : 'My Due Tasks'}
+        emptyMessage={
+          orgWide ? 'No active dispatches in the system.' : 'No assigned tasks found.'
+        }
       />
     </div>
   )
 }
-

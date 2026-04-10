@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const type = searchParams.get('type') || 'all'
+    const requestedCap = parseInt(searchParams.get('limit') || '20000', 10)
+    const cap = Math.min(100000, Math.max(1, Number.isNaN(requestedCap) ? 20000 : requestedCap))
 
-    let data: any = {}
+    let data: Record<string, unknown> = {}
 
     if (type === 'users' || type === 'all') {
       data.users = await prisma.user.findMany({
@@ -33,6 +35,8 @@ export async function GET(request: NextRequest) {
           createdAt: true,
           updatedAt: true,
         },
+        orderBy: { createdAt: 'desc' },
+        take: cap,
       })
     }
 
@@ -46,10 +50,14 @@ export async function GET(request: NextRequest) {
             select: { id: true, name: true, email: true },
           },
         },
+        orderBy: { createdAt: 'desc' },
+        take: cap,
       })
     }
 
-    logger.info('Database export', { type, exportedBy: user.userId })
+    data.exportLimitPerEntity = cap
+
+    logger.info('Database export', { type, exportedBy: user.userId, cap })
 
     return NextResponse.json(data, {
       headers: {
@@ -65,4 +73,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

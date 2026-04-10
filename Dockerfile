@@ -1,52 +1,46 @@
-
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl python3 make g++
+RUN apk add --no-cache libc6-compat openssl
 COPY package.json package-lock.json* ./
-RUN npm ci --silent
-
+RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl python3 make g++
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
 ARG NEXT_PUBLIC_BASE_PATH
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
+ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY package.json package-lock.json* ./
-
-RUN npm ci --silent
-
-COPY . .
-
-
-RUN find node_modules/.bin -type f -exec chmod +x {} \; 2>/dev/null || true && \
-    find node_modules/.bin -type l -exec chmod +x {} \; 2>/dev/null || true && \
-    find node_modules/next -type f -name "next" -exec chmod +x {} \; 2>/dev/null || true && \
-    chmod +x node_modules/.bin/* 2>/dev/null || true
-
-RUN npx prisma generate || true
-
-RUN node node_modules/next/dist/bin/next build || ./node_modules/.bin/next build || npx next build
-
+RUN npx prisma generate
+RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl su-exec
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-COPY --from=builder --chown=appuser:appgroup /app ./
 
-RUN chmod +x /app/docker/entrypoint.sh
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
 
-RUN mkdir -p /app/public/uploads/tasks && \
-    chown -R appuser:appgroup /app/public/uploads
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
+COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
+COPY --from=builder --chown=appuser:appgroup /app/prisma ./prisma
+COPY --from=builder --chown=appuser:appgroup /app/docker ./docker
+COPY --from=builder --chown=appuser:appgroup /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=appuser:appgroup /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=appuser:appgroup /app/node_modules/prisma ./node_modules/prisma
 
+RUN chmod +x /app/docker/entrypoint.sh \
+  && mkdir -p /app/public/uploads/tasks
 
 EXPOSE 3000
-ENV NODE_ENV=production
-ENV PORT=3000
 ENV PRISMA_MIGRATION_MODE=deploy
 
 ENTRYPOINT ["sh", "/app/docker/entrypoint.sh"]
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

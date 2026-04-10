@@ -33,13 +33,29 @@ export function NotificationPanel() {
 
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000) 
-    return () => clearInterval(interval)
+
+    const handleFocus = () => {
+      fetchNotifications()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [])
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch(withBasePath('/api/notifications?unreadOnly=true&limit=10'))
+      let response: Response | null = null
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await fetch(withBasePath('/api/notifications?unreadOnly=true&limit=10'))
+          break
+        } catch (error) {
+          if (attempt === 1) {
+            throw error
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300))
+        }
+      }
+      if (!response) return
       const data = await response.json()
 
       if (response.ok) {

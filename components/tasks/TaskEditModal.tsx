@@ -48,63 +48,102 @@ export function TaskEditModal({ isOpen, onClose, task, onSuccess }: TaskEditModa
   )
 
   useEffect(() => {
+    if (!isOpen) return
+
+    let isMounted = true
+    const controller = new AbortController()
+
+    const isAbortError = (error: unknown) =>
+      error instanceof DOMException && error.name === 'AbortError'
+
+    const fetchWithRetry = async (url: string, retries = 1): Promise<Response> => {
+      let lastError: unknown
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await fetch(url, { signal: controller.signal })
+        } catch (error) {
+          if (isAbortError(error)) {
+            throw error
+          }
+          lastError = error
+          if (attempt < retries) {
+            await new Promise((resolve) => setTimeout(resolve, 300))
+          }
+        }
+      }
+      throw lastError
+    }
+
     const fetchPriorities = async () => {
       try {
-        const response = await fetch(withBasePath('/api/priorities'))
+        const response = await fetchWithRetry(withBasePath('/api/priorities'))
         if (response.ok) {
           const data = await response.json()
-          if (data.priorities) {
+          if (isMounted && data.priorities) {
             setPriorities(data.priorities)
           }
         }
       } catch (error) {
-        console.error('Failed to fetch priorities', error)
+        if (!isAbortError(error)) {
+          console.error('Failed to fetch priorities', error)
+        }
       }
     }
     const fetchComplexities = async () => {
       try {
-        const response = await fetch(withBasePath('/api/complexities'))
+        const response = await fetchWithRetry(withBasePath('/api/complexities'))
         if (response.ok) {
           const data = await response.json()
-          if (data.complexities) {
+          if (isMounted && data.complexities) {
             setComplexities(data.complexities)
           }
         }
       } catch (error) {
-        console.error('Failed to fetch complexities', error)
+        if (!isAbortError(error)) {
+          console.error('Failed to fetch complexities', error)
+        }
       }
     }
     const fetchPersonnel = async () => {
       try {
-        const response = await fetch(withBasePath('/api/personnel'))
+        const response = await fetchWithRetry(withBasePath('/api/personnel'))
         if (response.ok) {
           const data = await response.json()
-          if (data.personnel) {
+          if (isMounted && data.personnel) {
             setPersonnel(data.personnel)
           }
         }
       } catch (error) {
-        console.error('Failed to fetch assigned personnel', error)
+        if (!isAbortError(error)) {
+          console.error('Failed to fetch assigned personnel', error)
+        }
       }
     }
     const fetchWorkcenters = async () => {
       try {
-        const response = await fetch(withBasePath('/api/workcenters'))
+        const response = await fetchWithRetry(withBasePath('/api/workcenters'))
         if (response.ok) {
           const data = await response.json()
-          if (data.workcenters) {
+          if (isMounted && data.workcenters) {
             setWorkcenters(data.workcenters)
           }
         }
       } catch (error) {
-        console.error('Failed to fetch workcenters', error)
+        if (!isAbortError(error)) {
+          console.error('Failed to fetch workcenters', error)
+        }
       }
     }
     fetchPriorities()
     fetchComplexities()
     fetchPersonnel()
     fetchWorkcenters()
-  }, [])
+
+    return () => {
+      isMounted = false
+      controller.abort()
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (isOpen) {

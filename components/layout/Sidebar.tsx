@@ -36,6 +36,7 @@ interface SidebarProps {
   canManageSettings?: boolean
   canManageReceives?: boolean
   canApproveCompletions?: boolean
+  canViewAllSubmissions?: boolean
   canViewReports?: boolean
   completionRequestCount?: number
 }
@@ -75,6 +76,29 @@ const navigation: NavItem[] = [
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    name: 'Request Masterfile Number',
+    href: '/masterfiles',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    name: 'My Masterfile Numbers',
+    href: '/masterfiles/requests',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        />
       </svg>
     ),
   },
@@ -208,6 +232,7 @@ export function Sidebar({
   canManageSettings = false,
   canManageReceives = false,
   canApproveCompletions = false,
+  canViewAllSubmissions = false,
   canViewReports = false,
   completionRequestCount = 0,
 }: SidebarProps) {
@@ -259,7 +284,10 @@ export function Sidebar({
     if (
       item.requiresCompletionPermission &&
       !canApproveCompletions &&
-      userRole !== 'SUPERADMIN'
+      !canViewAllSubmissions &&
+      userRole !== 'SUPERADMIN' &&
+      userRole !== 'DIRECTOR' &&
+      userRole !== 'DY_DIRECTOR'
     ) {
       return false
     }
@@ -304,6 +332,10 @@ export function Sidebar({
             const isActive =
               item.href === '/tasks'
                 ? normalizedPathname === item.href || normalizedPathname.startsWith('/tasks/')
+                : item.href === '/masterfiles'
+                ? normalizedPathname === '/masterfiles'
+                : item.href === '/masterfiles/requests'
+                ? normalizedPathname === '/masterfiles/requests'
                 : normalizedPathname === item.href
 
             return (

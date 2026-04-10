@@ -78,7 +78,11 @@ export function TaskDetailsClient({
   }
 
   const isAdminViewer =
-    currentUser.role === 'SUPERADMIN' || currentUser.role === 'DIRECTOR'
+    currentUser.role === 'SUPERADMIN' ||
+    currentUser.role === 'DIRECTOR' ||
+    currentUser.role === 'DY_DIRECTOR' ||
+    currentUser.canViewAllSubmissions === true ||
+    currentUser.canApproveCompletions === true
   const isCurrentAssignee = task.assignedTo?.id === currentUser.id
   const showDeadline =
     task.status !== 'COMPLETED' &&

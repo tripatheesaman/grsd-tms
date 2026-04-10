@@ -36,7 +36,19 @@ export function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch(withBasePath('/api/notifications?limit=20'))
+      let response: Response | null = null
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await fetch(withBasePath('/api/notifications?limit=20'))
+          break
+        } catch (error) {
+          if (attempt === 1) {
+            throw error
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300))
+        }
+      }
+      if (!response) return
       const data = await response.json()
 
       if (response.ok) {
@@ -99,22 +111,15 @@ export function NotificationBell() {
 
   const markAllAsRead = async () => {
     try {
-      await Promise.all(
-        notifications
-          .filter((n) => !n.read)
-          .map((n) =>
-            fetch(withBasePath('/api/notifications'), {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                notificationId: n.id,
-                read: true,
-              }),
-            })
-          )
-      )
+      await fetch(withBasePath('/api/notifications'), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          markAllRead: true,
+        }),
+      })
       fetchNotifications()
     } catch (error) {
       console.error('Error marking all as read:', error)

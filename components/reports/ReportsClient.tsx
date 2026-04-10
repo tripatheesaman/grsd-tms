@@ -18,6 +18,8 @@ interface ReportsClientProps {
   defaultEndDate: string
 }
 
+const PREVIEW_PAGE_SIZE = 100
+
 export function ReportsClient({
   defaultStartDate,
   defaultEndDate,
@@ -29,36 +31,53 @@ export function ReportsClient({
   const [loading, setLoading] = useState(false)
   const [reportData, setReportData] = useState<any[]>([])
   const [totalRecords, setTotalRecords] = useState(0)
-
-  const fetchReportData = async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        type: reportType,
-        ...(startDate && { startDate }),
-        ...(endDate && { endDate }),
-      })
-
-      const response = await fetch(withBasePath(`/api/reports?${params.toString()}`))
-      if (!response.ok) {
-        throw new Error('Failed to fetch report data')
-      }
-
-      const data = await response.json()
-      setReportData(data.data || [])
-      setTotalRecords(data.totalRecords || 0)
-    } catch (error) {
-      toast.error('Failed to load report data')
-      console.error(error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
 
   useEffect(() => {
-    fetchReportData()
-    
+    setPage(1)
   }, [reportType, startDate, endDate])
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams({
+          type: reportType,
+          page: String(page),
+          limit: String(PREVIEW_PAGE_SIZE),
+          ...(startDate && { startDate }),
+          ...(endDate && { endDate }),
+        })
+
+        const response = await fetch(withBasePath(`/api/reports?${params.toString()}`))
+        if (!response.ok) {
+          throw new Error('Failed to fetch report data')
+        }
+
+        const data = await response.json()
+        if (!cancelled) {
+          setReportData(data.data || [])
+          setTotalRecords(data.totalRecords || 0)
+          setTotalPages(data.totalPages ?? 0)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error('Failed to load report data')
+          console.error(error)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [reportType, startDate, endDate, page])
 
   const handleExport = async (format: ExportFormat) => {
     try {
@@ -72,19 +91,23 @@ export function ReportsClient({
 
       const response = await fetch(withBasePath(`/api/reports/export?${params.toString()}`))
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Export failed')
+        const ct = response.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          const errBody = await response.json()
+          throw new Error(errBody.error || 'Export failed')
+        }
+        throw new Error('Export failed')
       }
 
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      
+
       const reportTypeName = reportType.replace(/-/g, '_')
       const dateStr = new Date().toISOString().split('T')[0]
       a.download = `report_${reportTypeName}_${dateStr}.${format === 'excel' ? 'xlsx' : format}`
-      
+
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -115,11 +138,11 @@ export function ReportsClient({
   const getReportDescription = () => {
     switch (reportType) {
       case 'receive-only':
-        return 'This report contains only receive-related information including received from, subject, letter reference number, registration number, and received date.'
+        return 'Receive-related fields: from, subject, references, registration number, received date.'
       case 'assign-only':
-        return 'This report contains only task assignment information including complexity, priority, deadlines, assigned personnel, workcenter, and completion metrics.'
+        return 'Assignment fields: complexity, priority, deadlines, personnel, workcenter, completion metrics.'
       case 'receive-and-assign':
-        return 'This comprehensive report includes both receive and assignment information with complete tracking of tasks from receipt through completion, including deviation analysis.'
+        return 'Combined receive and assignment data with deviation analysis.'
       default:
         return ''
     }
@@ -127,7 +150,6 @@ export function ReportsClient({
 
   return (
     <div className="space-y-6">
-      {}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="relative w-16 h-16">
@@ -149,7 +171,6 @@ export function ReportsClient({
         </div>
       </div>
 
-      {}
       <Card className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -200,13 +221,14 @@ export function ReportsClient({
         </div>
       </Card>
 
-      {}
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-slate-800">Export Report</h2>
             <p className="text-sm text-slate-600 mt-1">
               Total Records: <span className="font-semibold">{totalRecords}</span>
+              {' · '}
+              Large exports: use CSV (streams data). Excel/PDF are capped by server settings.
             </p>
           </div>
           <div className="flex gap-3">
@@ -277,7 +299,6 @@ export function ReportsClient({
         </div>
       </Card>
 
-      {}
       <Card className="p-6">
         <h2 className="text-xl font-semibold text-slate-800 mb-4">Report Preview</h2>
         {loading ? (
@@ -317,7 +338,7 @@ export function ReportsClient({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
-                {reportData.slice(0, 50).map((row, idx) => (
+                {reportData.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50">
                     {Object.values(row).map((value: any, cellIdx) => (
                       <td
@@ -331,9 +352,29 @@ export function ReportsClient({
                 ))}
               </tbody>
             </table>
-            {reportData.length > 50 && (
-              <div className="mt-4 text-center text-sm text-slate-600">
-                Showing first 50 of {reportData.length} records. Export to see all data.
+            {totalPages > 1 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+                <span>
+                  Page {page} of {totalPages} ({totalRecords} total)
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={page >= totalPages || loading}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -342,4 +383,3 @@ export function ReportsClient({
     </div>
   )
 }
-

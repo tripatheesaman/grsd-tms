@@ -61,6 +61,7 @@ export default function TasksPage() {
   const [canCreateTasks, setCanCreateTasks] = useState<boolean | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null)
+  const [canSeeAllTaskDeadlines, setCanSeeAllTaskDeadlines] = useState(false)
   useEffect(() => {
     let isMounted = true
     const checkPermission = async () => {
@@ -73,10 +74,17 @@ export default function TasksPage() {
         const userInfo = data?.user
         const allowed =
           userInfo?.role === 'SUPERADMIN' || userInfo?.canCreateTasks
+        const oversight =
+          userInfo?.role === 'SUPERADMIN' ||
+          userInfo?.role === 'DIRECTOR' ||
+          userInfo?.role === 'DY_DIRECTOR' ||
+          userInfo?.canViewAllSubmissions === true ||
+          userInfo?.canApproveCompletions === true
         if (isMounted) {
           setCanCreateTasks(Boolean(allowed))
           setCurrentUserId(userInfo?.id ?? null)
           setCurrentUserRole(userInfo?.role ?? null)
+          setCanSeeAllTaskDeadlines(Boolean(oversight))
         }
       } catch (error) {
         if (isMounted) {
@@ -93,7 +101,7 @@ export default function TasksPage() {
 
 
   
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -148,16 +156,22 @@ export default function TasksPage() {
         params.append('createdDateTo', createdDateTo)
       }
 
-      const response = await fetch(withBasePath(`/api/tasks?${params.toString()}`))
+      const response = await fetch(withBasePath(`/api/tasks?${params.toString()}`), {
+        signal,
+      })
       const data = await response.json()
 
       if (response.ok) {
         setTasks(data.tasks || [])
       }
     } catch (error) {
-      console.error('Error fetching tasks:', error)
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        console.error('Error fetching tasks:', error)
+      }
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) {
+        setLoading(false)
+      }
     }
   }, [
     recordNumberSearch,
@@ -176,13 +190,16 @@ export default function TasksPage() {
     createdDateTo,
   ])
 
-  
   useEffect(() => {
+    const controller = new AbortController()
     const timeoutId = setTimeout(() => {
-      fetchTasks()
-    }, 500) 
+      fetchTasks(controller.signal)
+    }, 300)
 
-    return () => clearTimeout(timeoutId)
+    return () => {
+      clearTimeout(timeoutId)
+      controller.abort()
+    }
   }, [
     recordNumberSearch,
     fileNumberSearch,
@@ -190,13 +207,16 @@ export default function TasksPage() {
     bodySearch,
     assigneeSearch,
     creatorSearch,
+    statusFilter,
+    priorityFilter,
+    assignedFilter,
+    sortBy,
+    dueDateFrom,
+    dueDateTo,
+    createdDateFrom,
+    createdDateTo,
     fetchTasks,
   ])
-
-  
-  useEffect(() => {
-    fetchTasks()
-  }, [statusFilter, priorityFilter, assignedFilter, sortBy, dueDateFrom, dueDateTo, createdDateFrom, createdDateTo, fetchTasks])
 
   const clearFilters = () => {
     setRecordNumberSearch('')
@@ -441,14 +461,12 @@ export default function TasksPage() {
       ) : (
         <div className="grid gap-4">
           {tasks.map((task) => {
-            const isAdminViewer =
-              currentUserRole === 'SUPERADMIN' || currentUserRole === 'DIRECTOR'
             const isCurrentAssignee =
               task.assignedTo?.id && task.assignedTo.id === currentUserId
             const showDeadline =
               task.status !== 'COMPLETED' &&
               task.status !== 'CLOSED' &&
-              (isAdminViewer || isCurrentAssignee)
+              (canSeeAllTaskDeadlines || isCurrentAssignee)
             const daysLeft = showDeadline
               ? daysUntilStoredDeadline(task.assignedCompletionDate)
               : 0
