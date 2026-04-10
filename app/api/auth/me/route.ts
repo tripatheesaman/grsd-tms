@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         canCreateTasks: true,
         canManageSettings: true,
         canViewAllSubmissions: true,
+        canApproveCompletions: true,
         includeInAllStaff: true,
       },
     })

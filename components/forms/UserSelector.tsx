@@ -76,6 +76,7 @@ export function UserSelector({
   }
 
   useEffect(() => {
+    const controller = new AbortController()
     const fetchSuggestions = async () => {
       if (inputValue.length < 2) {
         setSuggestions([])
@@ -91,7 +92,10 @@ export function UserSelector({
         lowerInput.includes('all staff')
 
       try {
-        const response = await fetch(withBasePath(`/api/users/search?q=${encodeURIComponent(inputValue)}`))
+        const response = await fetch(
+          withBasePath(`/api/users/search?q=${encodeURIComponent(inputValue)}`),
+          { signal: controller.signal }
+        )
         if (response.ok) {
           const data = await response.json()
           const excludedIds = new Set(excludeUserIdsRef.current)
@@ -124,11 +128,17 @@ export function UserSelector({
           setShowSuggestions(filtered.length > 0)
         }
       } catch (error) {
-        console.error('Error fetching user suggestions:', error)
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          console.error('Error fetching user suggestions:', error)
+        }
       }
     }
 
-    fetchSuggestions()
+    const timeoutId = setTimeout(fetchSuggestions, 300)
+    return () => {
+      clearTimeout(timeoutId)
+      controller.abort()
+    }
   }, [inputValue, selectedUsers])
 
   useEffect(() => {

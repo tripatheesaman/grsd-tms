@@ -27,6 +27,8 @@ export default async function SettingsPage() {
         currentFy: config.currentFy,
         dispatchStartNumber: config.dispatchStartNumber,
         receiveStartNumber: config.receiveStartNumber,
+        masterfileStartNumber: config.masterfileStartNumber,
+        masterfileMaxTotal: config.masterfileMaxTotal ?? null,
         smtpHost: config.smtpHost || '',
         smtpPort: config.smtpPort || 587,
         smtpSecure: config.smtpSecure,

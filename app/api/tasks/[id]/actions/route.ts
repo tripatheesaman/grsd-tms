@@ -471,17 +471,17 @@ export async function POST(
       const notifyMessage = fullCompletion
         ? `Dispatch completed and awaiting acknowledgment: ${task.recordNumber}`
         : `Dispatch ${task.recordNumber}: submission from ${submitterLabel} is ready for review.`
-      for (const reviewerId of reviewerIds) {
-        if (reviewerId === user.userId) {
-          continue
-        }
-        await prisma.notification.create({
-          data: {
-            userId: reviewerId,
-            taskId: task.id,
-            type: 'TASK_UPDATED',
-            message: notifyMessage,
-          },
+      const reviewerNotificationRows = reviewerIds
+        .filter((reviewerId) => reviewerId !== user.userId)
+        .map((reviewerId) => ({
+          userId: reviewerId,
+          taskId: task.id,
+          type: 'TASK_UPDATED' as const,
+          message: notifyMessage,
+        }))
+      if (reviewerNotificationRows.length > 0) {
+        await prisma.notification.createMany({
+          data: reviewerNotificationRows,
         })
       }
     } else if (actionType === 'ADD_INFO') {

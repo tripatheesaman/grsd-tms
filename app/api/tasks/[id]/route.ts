@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { canAccessTaskWorkspace } from '@/lib/task-visibility'
 import { canEditTask } from '@/lib/roles'
 import { sendTaskNotificationEmail } from '@/lib/email'
 import type { UserRole } from '@/types'
@@ -29,6 +30,45 @@ export async function GET(
     }
 
     const { id } = await params
+
+    const viewer = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: {
+        role: true,
+        canViewAllSubmissions: true,
+        canApproveCompletions: true,
+      },
+    })
+    if (!viewer) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const gate = await prisma.task.findUnique({
+      where: { id },
+      select: {
+        createdById: true,
+        assignedToId: true,
+        assignments: { select: { userId: true } },
+        actions: { select: { performedById: true, forwardedToId: true } },
+        submissions: { select: { userId: true } },
+        attachments: { select: { uploadedById: true } },
+        history: { select: { changedById: true } },
+      },
+    })
+    if (!gate) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+    if (
+      !canAccessTaskWorkspace(user.userId, viewer, {
+        ...gate,
+        actions: gate.actions ?? [],
+        submissions: gate.submissions ?? [],
+        attachments: gate.attachments ?? [],
+        history: gate.history ?? [],
+      })
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const task = await prisma.task.findUnique({
       where: { id },

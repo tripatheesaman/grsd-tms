@@ -12,6 +12,8 @@ interface SettingsClientProps {
     currentFy: string
     dispatchStartNumber: number
     receiveStartNumber: number
+    masterfileStartNumber: number
+    masterfileMaxTotal: number | null
     smtpHost: string
     smtpPort: number
     smtpSecure: boolean
@@ -78,7 +80,7 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
         <p className="text-gray-600 mt-1">
-          Configure SMTP and fiscal-year numbering for receive and dispatch records.
+          Configure SMTP and fiscal-year numbering for dispatch, receive, and masterfile records.
         </p>
       </div>
 
@@ -118,10 +120,42 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
                 }))
               }
             />
+            <Input
+              label="Masterfile Start Number"
+              type="number"
+              min={1}
+              value={String(settings.masterfileStartNumber)}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  masterfileStartNumber: Math.max(1, Number(e.target.value || 1)),
+                }))
+              }
+            />
+            <Input
+              label="Masterfile Maximum Total (optional)"
+              type="number"
+              min={1}
+              value={
+                settings.masterfileMaxTotal === null || settings.masterfileMaxTotal === undefined
+                  ? ''
+                  : String(settings.masterfileMaxTotal)
+              }
+              onChange={(e) => {
+                const raw = e.target.value.trim()
+                setSettings((prev) => ({
+                  ...prev,
+                  masterfileMaxTotal: raw === '' ? null : Math.max(1, Number(raw)),
+                }))
+              }}
+              placeholder="No limit"
+            />
           </div>
           <p className="text-sm text-gray-500">
             Number format: <strong>Dispatch</strong> = `D-FY-sequence`,{' '}
-            <strong>Receive</strong> = `R-FY-sequence`.
+            <strong>Receive</strong> = `R-FY-sequence`, <strong>Masterfile</strong> = `MF-FY-sequence`.
+            Masterfile maximum total is the highest allowed sequence value for the current fiscal year
+            (leave blank for no limit).
           </p>
         </CardContent>
       </Card>

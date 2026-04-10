@@ -17,6 +17,9 @@
     "lint": "eslint",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
+    "db:migrate": "npx prisma migrate deploy",
+    "db:migrate:dev": "npx prisma migrate dev",
+    "db:apply-fulltext": "npx prisma db execute --file prisma/migrations/20260410180000_add_fulltext_search/migration.sql",
     "db:studio": "npx prisma studio"
   },
   "dependencies": {

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { prisma, prismaRead } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { resolveFulltextTaskIdFilter } from '@/lib/task-fulltext'
+import { canViewAllTasksAndProgress } from '@/lib/task-visibility'
 import { dueTasksSubmissionOrClause } from '@/lib/due-task-where'
-import { getNextDispatchRecordNumber } from '@/lib/sequences'
+import {
+  getNextDispatchRecordNumber,
+  getNextMasterfileRecord,
+  MasterfileSequenceExhaustedError,
+} from '@/lib/sequences'
 import { sendTaskNotificationEmail, sendNoticeEmail } from '@/lib/email'
 import { saveFile } from '@/lib/storage'
 
@@ -30,24 +36,22 @@ export async function GET(request: NextRequest) {
     const createdDateFrom = searchParams.get('createdDateFrom')
     const createdDateTo = searchParams.get('createdDateTo')
     const sortBy = searchParams.get('sortBy') || 'created'
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const requestedLimit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(50, Math.max(1, Number.isNaN(requestedLimit) ? 20 : requestedLimit))
     const skip = (page - 1) * limit
 
     const where: any = {}
     const andConditions: any[] = []
 
-    
     if (status) {
       andConditions.push({ status })
     }
 
-    
     if (priorityId) {
       andConditions.push({ priorityId })
     }
 
-    
     if (assignedTo === 'me') {
       andConditions.push({
         OR: [
@@ -68,116 +72,150 @@ export async function GET(request: NextRequest) {
       andConditions.push({ assignedToId: assignedTo })
     }
 
-    
-    if (recordNumber && recordNumber.trim()) {
-      andConditions.push({
-        recordNumber: {
-          contains: recordNumber.trim(),
-        },
-      })
-    }
-
-    if (fileNumber && fileNumber.trim()) {
-      andConditions.push({
-        fileNumber: {
-          contains: fileNumber.trim(),
-        },
-      })
-    }
-
-    if (subject && subject.trim()) {
-      andConditions.push({
-        receive: {
-          subject: {
-            contains: subject.trim(),
-          },
-        },
-      })
-    }
-
     const bodySearchTerm = body?.trim() || description?.trim()
-    if (bodySearchTerm) {
-      andConditions.push({
-        OR: [
-          {
-            descriptionOfWork: {
-              contains: bodySearchTerm,
-            },
-          },
-          {
-            issuanceMessage: {
-              contains: bodySearchTerm,
-            },
-          },
-        ],
-      })
+    const wantsTextSearch = Boolean(
+      (recordNumber && recordNumber.trim()) ||
+        (fileNumber && fileNumber.trim()) ||
+        (subject && subject.trim()) ||
+        bodySearchTerm ||
+        (assignee && assignee.trim()) ||
+        (creator && creator.trim())
+    )
+    const fulltextEnabled =
+      process.env.TASK_SEARCH_FULLTEXT !== 'false' &&
+      process.env.TASK_SEARCH_FULLTEXT !== '0'
+
+    let usedFulltext = false
+    if (fulltextEnabled && wantsTextSearch) {
+      try {
+        const ftIds = await resolveFulltextTaskIdFilter(prismaRead, {
+          recordNumber,
+          fileNumber,
+          subject,
+          bodyOrDescription: bodySearchTerm || undefined,
+          assignee,
+          creator,
+        })
+        if (ftIds !== null) {
+          usedFulltext = true
+          andConditions.push({ id: { in: ftIds } })
+        }
+      } catch (err) {
+        logger.warn('Task full-text search failed; using LIKE fallback', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
     }
 
-    if (assignee && assignee.trim()) {
-      const assigneeTerm = assignee.trim()
-      andConditions.push({
-        OR: [
-          {
-            assignedTo: {
-              name: {
-                contains: assigneeTerm,
-              },
+    if (!usedFulltext) {
+      if (recordNumber && recordNumber.trim()) {
+        andConditions.push({
+          recordNumber: {
+            contains: recordNumber.trim(),
+          },
+        })
+      }
+
+      if (fileNumber && fileNumber.trim()) {
+        andConditions.push({
+          fileNumber: {
+            contains: fileNumber.trim(),
+          },
+        })
+      }
+
+      if (subject && subject.trim()) {
+        andConditions.push({
+          receive: {
+            subject: {
+              contains: subject.trim(),
             },
           },
-          {
-            assignedTo: {
-              email: {
-                contains: assigneeTerm,
+        })
+      }
+
+      if (bodySearchTerm) {
+        andConditions.push({
+          OR: [
+            {
+              descriptionOfWork: {
+                contains: bodySearchTerm,
               },
             },
-          },
-          {
-            assignments: {
-              some: {
-                user: {
-                  OR: [
-                    {
-                      name: {
-                        contains: assigneeTerm,
-                      },
-                    },
-                    {
-                      email: {
-                        contains: assigneeTerm,
-                      },
-                    },
-                  ],
+            {
+              issuanceMessage: {
+                contains: bodySearchTerm,
+              },
+            },
+          ],
+        })
+      }
+
+      if (assignee && assignee.trim()) {
+        const assigneeTerm = assignee.trim()
+        andConditions.push({
+          OR: [
+            {
+              assignedTo: {
+                name: {
+                  contains: assigneeTerm,
                 },
               },
             },
-          },
-        ],
-      })
-    }
-
-    if (creator && creator.trim()) {
-      const creatorTerm = creator.trim()
-      andConditions.push({
-        OR: [
-          {
-            createdBy: {
-              name: {
-                contains: creatorTerm,
+            {
+              assignedTo: {
+                email: {
+                  contains: assigneeTerm,
+                },
               },
             },
-          },
-          {
-            createdBy: {
-              email: {
-                contains: creatorTerm,
+            {
+              assignments: {
+                some: {
+                  user: {
+                    OR: [
+                      {
+                        name: {
+                          contains: assigneeTerm,
+                        },
+                      },
+                      {
+                        email: {
+                          contains: assigneeTerm,
+                        },
+                      },
+                    ],
+                  },
+                },
               },
             },
-          },
-        ],
-      })
+          ],
+        })
+      }
+
+      if (creator && creator.trim()) {
+        const creatorTerm = creator.trim()
+        andConditions.push({
+          OR: [
+            {
+              createdBy: {
+                name: {
+                  contains: creatorTerm,
+                },
+              },
+            },
+            {
+              createdBy: {
+                email: {
+                  contains: creatorTerm,
+                },
+              },
+            },
+          ],
+        })
+      }
     }
 
-    
     if (dueDateFrom) {
       andConditions.push({
         assignedCompletionDate: {
@@ -219,13 +257,15 @@ export async function GET(request: NextRequest) {
       select: {
         role: true,
         canApproveCompletions: true,
+        canViewAllSubmissions: true,
       },
     })
     const role = accessUser?.role ?? user.role
-    const canViewAll =
-      role === 'SUPERADMIN' ||
-      role === 'DIRECTOR' ||
-      accessUser?.canApproveCompletions === true
+    const canViewAll = canViewAllTasksAndProgress({
+      role,
+      canApproveCompletions: accessUser?.canApproveCompletions,
+      canViewAllSubmissions: accessUser?.canViewAllSubmissions,
+    })
 
     if (!canViewAll) {
       andConditions.push({
@@ -266,7 +306,7 @@ export async function GET(request: NextRequest) {
       orderBy = { assignedCompletionDate: 'asc' }
     } else if (sortBy === 'priority') {
       
-      orderBy = { priority: { order: 'asc' } }
+      orderBy = { priority: { order: 'desc' } }
     } else if (sortBy === 'created') {
       orderBy = { createdAt: 'desc' }
     } else if (sortBy === 'status') {
@@ -290,33 +330,15 @@ export async function GET(request: NextRequest) {
               },
             },
           },
-          complexity: {
-            select: { id: true, name: true, order: true },
-          },
-          assignedPersonnel: {
-            select: { id: true, name: true, order: true },
-          },
           priority: {
             select: { id: true, name: true, order: true },
           },
-          workcenter: {
-            select: { id: true, name: true },
-          },
-          attachments: true,
           actions: {
+            where: { actionType: 'SUBMITTED' },
             select: {
               actionType: true,
               performedById: true,
             },
-          },
-          submissions: {
-            select: {
-              userId: true,
-              status: true,
-            },
-          },
-          _count: {
-            select: { actions: true, notifications: true },
           },
         },
         orderBy,
@@ -326,18 +348,8 @@ export async function GET(request: NextRequest) {
       prisma.task.count({ where }),
     ])
 
-    
-    let sortedTasks = tasks
-    if (sortBy === 'priority') {
-      sortedTasks = [...tasks].sort((a, b) => {
-        const aOrder = (a.priority as any)?.order || 0
-        const bOrder = (b.priority as any)?.order || 0
-        return bOrder - aOrder 
-      })
-    }
-
     return NextResponse.json({
-      tasks: sortedTasks,
+      tasks,
       pagination: {
         page,
         limit,
@@ -522,6 +534,29 @@ export async function POST(request: NextRequest) {
           )
         }
 
+        const internalTokens = userIds
+          .map((token) => token.trim())
+          .filter(
+            (token) =>
+              Boolean(token) &&
+              !token.startsWith('external-email:') &&
+              !token.startsWith('external-name:') &&
+              !token.startsWith('external-') &&
+              token.toLowerCase() !== 'allstaff' &&
+              token.toLowerCase() !== 'allstaff@nac.com.np'
+          )
+        const uniqueInternalTokens = Array.from(new Set(internalTokens))
+        const internalUsersById = new Map<string, { id: string; email: string; name: string }>()
+        if (uniqueInternalTokens.length > 0) {
+          const internalUsers = await prisma.user.findMany({
+            where: { id: { in: uniqueInternalTokens } },
+            select: { id: true, email: true, name: true },
+          })
+          for (const internalUser of internalUsers) {
+            internalUsersById.set(internalUser.id, internalUser)
+          }
+        }
+
         for (const rawToken of userIds) {
           const token = rawToken.trim()
           if (!token) continue
@@ -534,7 +569,8 @@ export async function POST(request: NextRequest) {
                 select: { id: true, email: true, name: true },
               })
             }
-            for (const staffUser of cachedAllStaffUsers) {
+            const staffList = cachedAllStaffUsers
+            for (const staffUser of staffList) {
               addInternalAssignee(staffUser)
             }
             continue
@@ -567,10 +603,7 @@ export async function POST(request: NextRequest) {
             continue
           }
 
-          const assignedUser = await prisma.user.findUnique({
-            where: { id: token },
-            select: { id: true, email: true, name: true },
-          })
+          const assignedUser = internalUsersById.get(token)
           if (assignedUser) {
             addInternalAssignee(assignedUser)
           }
@@ -634,7 +667,9 @@ export async function POST(request: NextRequest) {
 
     if (isNotice) {
       
-      const recordNumber = await getNextDispatchRecordNumber()
+      const recordNumber = receiveId
+        ? await getNextDispatchRecordNumber()
+        : (await getNextMasterfileRecord()).masterfileNumber
       
       
       const internalAssignees = assignees.filter(a => a.type === 'internal')
@@ -693,25 +728,28 @@ export async function POST(request: NextRequest) {
       })
 
       
-      for (const assignee of internalAssignees) {
-        if (assignee.userId) {
-          await prisma.taskAssignment.create({
-            data: {
-              taskId: task.id,
-              userId: assignee.userId,
-              isOriginal: true,
-              isCc: false,
-              originalAssigneeId: assignee.userId,
-            },
-          })
-          await prisma.taskSubmission.create({
-            data: {
-              taskId: task.id,
-              userId: assignee.userId,
-              status: 'PENDING',
-            },
-          })
-        }
+      const internalAssigneeIds = internalAssignees
+        .map((assignee) => assignee.userId)
+        .filter((userId): userId is string => Boolean(userId))
+      if (internalAssigneeIds.length > 0) {
+        await prisma.taskAssignment.createMany({
+          data: internalAssigneeIds.map((userId) => ({
+            taskId: task.id,
+            userId,
+            isOriginal: true,
+            isCc: false,
+            originalAssigneeId: userId,
+          })),
+          skipDuplicates: true,
+        })
+        await prisma.taskSubmission.createMany({
+          data: internalAssigneeIds.map((userId) => ({
+            taskId: task.id,
+            userId,
+            status: 'PENDING',
+          })),
+          skipDuplicates: true,
+        })
       }
 
       
@@ -748,6 +786,7 @@ export async function POST(request: NextRequest) {
       })
 
       
+      const internalNotificationRows: Array<{ userId: string; taskId: string; type: 'TASK_ASSIGNED'; message: string }> = []
       for (const assignee of assignees) {
         if (assignee.email) {
           try {
@@ -761,13 +800,11 @@ export async function POST(request: NextRequest) {
             })
 
             if (assignee.type === 'internal' && assignee.userId) {
-              await prisma.notification.create({
-                data: {
-                  userId: assignee.userId,
-                  taskId: task.id,
-                  type: 'TASK_ASSIGNED',
-                  message: `New notice: ${task.recordNumber}`,
-                },
+              internalNotificationRows.push({
+                userId: assignee.userId,
+                taskId: task.id,
+                type: 'TASK_ASSIGNED',
+                message: `New notice: ${task.recordNumber}`,
               })
             }
           } catch (emailError) {
@@ -775,10 +812,17 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+      if (internalNotificationRows.length > 0) {
+        await prisma.notification.createMany({
+          data: internalNotificationRows,
+        })
+      }
 
       createdTasks.push(task)
     } else {
-      const recordNumber = await getNextDispatchRecordNumber()
+      const recordNumber = receiveId
+        ? await getNextDispatchRecordNumber()
+        : (await getNextMasterfileRecord()).masterfileNumber
       const internalAssignees = assignees.filter((a) => a.type === 'internal')
       const externalEmailAssignees = assignees.filter((a) => a.type === 'external-email')
       const externalNameAssignees = assignees.filter((a) => a.type === 'external-name')
@@ -832,36 +876,41 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      for (const assignee of internalAssignees) {
-        if (assignee.userId) {
-          const isPrimary = assignee.userId === assignedToId
-          const isOriginal = submissionMode === 'MULTIPLE' ? true : isPrimary
-          const isCc = submissionMode === 'MULTIPLE' ? false : !isPrimary
-          await prisma.taskAssignment.create({
-            data: {
+      const internalAssigneeIds = internalAssignees
+        .map((assignee) => assignee.userId)
+        .filter((userId): userId is string => Boolean(userId))
+      if (internalAssigneeIds.length > 0) {
+        await prisma.taskAssignment.createMany({
+          data: internalAssigneeIds.map((userId) => {
+            const isPrimary = userId === assignedToId
+            const isOriginal = submissionMode === 'MULTIPLE' ? true : isPrimary
+            const isCc = submissionMode === 'MULTIPLE' ? false : !isPrimary
+            return {
               taskId: task.id,
-              userId: assignee.userId,
+              userId,
               isOriginal,
               isCc,
-              originalAssigneeId:
-                submissionMode === 'MULTIPLE'
-                  ? assignee.userId
-                  : assignedToId || null,
-            },
-          })
-          await prisma.taskSubmission.create({
-            data: {
+              originalAssigneeId: submissionMode === 'MULTIPLE' ? userId : assignedToId || null,
+            }
+          }),
+          skipDuplicates: true,
+        })
+        await prisma.taskSubmission.createMany({
+          data: internalAssigneeIds.map((userId) => {
+            const isPrimary = userId === assignedToId
+            return {
               taskId: task.id,
-              userId: assignee.userId,
+              userId,
               status:
                 submissionMode === 'MULTIPLE'
                   ? 'PENDING'
                   : isPrimary
                   ? 'PENDING'
                   : 'FORWARDED',
-            },
-          })
-        }
+            }
+          }),
+          skipDuplicates: true,
+        })
       }
 
       if (attachmentPath && file) {
@@ -894,6 +943,7 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      const internalNotificationRows: Array<{ userId: string; taskId: string; type: 'TASK_ASSIGNED'; message: string }> = []
       for (const assignee of assignees) {
         if (assignee.email) {
           try {
@@ -910,19 +960,22 @@ export async function POST(request: NextRequest) {
             })
 
             if (assignee.type === 'internal' && assignee.userId) {
-              await prisma.notification.create({
-                data: {
-                  userId: assignee.userId,
-                  taskId: task.id,
-                  type: 'TASK_ASSIGNED',
-                  message: `New dispatch assigned: ${task.recordNumber}`,
-                },
+              internalNotificationRows.push({
+                userId: assignee.userId,
+                taskId: task.id,
+                type: 'TASK_ASSIGNED',
+                message: `New dispatch assigned: ${task.recordNumber}`,
               })
             }
           } catch (emailError) {
             logger.error('Error sending task notification email', emailError)
           }
         }
+      }
+      if (internalNotificationRows.length > 0) {
+        await prisma.notification.createMany({
+          data: internalNotificationRows,
+        })
       }
 
       createdTasks.push(task)
@@ -946,6 +999,14 @@ export async function POST(request: NextRequest) {
       tasks: createdTasks, 
     }, { status: 201 })
   } catch (error) {
+    if (error instanceof MasterfileSequenceExhaustedError) {
+      return NextResponse.json(
+        {
+          error: `Masterfile number limit for this fiscal year (${error.maxTotal}) has been reached. Raise the maximum in System Settings if appropriate.`,
+        },
+        { status: 409 }
+      )
+    }
     logger.error('Error creating task', error)
     return NextResponse.json(
       { error: 'Internal server error' },

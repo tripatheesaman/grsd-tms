@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { existsSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { logger } from '@/lib/logger'
+import { canAccessTaskWorkspace } from '@/lib/task-visibility'
 
 export async function GET(
   request: NextRequest,
@@ -16,6 +17,18 @@ export async function GET(
     }
 
     const { id } = await params
+
+    const viewer = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: {
+        role: true,
+        canViewAllSubmissions: true,
+        canApproveCompletions: true,
+      },
+    })
+    if (!viewer) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const attachment = await prisma.taskAttachment.findUnique({
       where: { id },
@@ -30,6 +43,12 @@ export async function GET(
                 userId: true,
               },
             },
+            actions: {
+              select: { performedById: true, forwardedToId: true },
+            },
+            submissions: { select: { userId: true } },
+            history: { select: { changedById: true } },
+            attachments: { select: { uploadedById: true } },
           },
         },
       },
@@ -39,13 +58,18 @@ export async function GET(
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
-    
+    const task = attachment.task
     const hasAccess =
-      attachment.task.assignedToId === user.userId ||
-      attachment.task.assignments.some((assignment) => assignment.userId === user.userId) ||
-      attachment.task.createdById === user.userId ||
-      user.role === 'SUPERADMIN' ||
-      user.role === 'DIRECTOR'
+      attachment.uploadedById === user.userId ||
+      canAccessTaskWorkspace(user.userId, viewer, {
+        createdById: task.createdById,
+        assignedToId: task.assignedToId,
+        assignments: task.assignments,
+        actions: task.actions ?? [],
+        submissions: task.submissions ?? [],
+        attachments: task.attachments ?? [],
+        history: task.history ?? [],
+      })
 
     if (!hasAccess) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })

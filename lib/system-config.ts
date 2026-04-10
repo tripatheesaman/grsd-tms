@@ -22,6 +22,7 @@ export async function ensureAppConfig() {
       currentFy: computedFy,
       dispatchStartNumber: 1,
       receiveStartNumber: 1,
+      masterfileStartNumber: 1,
       smtpPort: 587,
       smtpSecure: false,
     },

@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const requestedLimit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(20, Math.max(1, Number.isNaN(requestedLimit) ? 20 : requestedLimit))
 
     const where: any = {
       userId: user.userId,
@@ -22,30 +23,35 @@ export async function GET(request: NextRequest) {
       where.read = false
     }
 
-    const notifications = await prisma.notification.findMany({
-      where,
-      include: {
-        task: {
-          select: {
-            id: true,
-            recordNumber: true,
-            status: true,
-            assignedCompletionDate: true,
-            priority: true,
-            descriptionOfWork: true,
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        include: {
+          task: {
+            select: {
+              id: true,
+              recordNumber: true,
+              status: true,
+              assignedCompletionDate: true,
+              priority: {
+                select: {
+                  name: true,
+                },
+              },
+              descriptionOfWork: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    })
-
-    const unreadCount = await prisma.notification.count({
-      where: {
-        userId: user.userId,
-        read: false,
-      },
-    })
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+      prisma.notification.count({
+        where: {
+          userId: user.userId,
+          read: false,
+        },
+      }),
+    ])
 
     return NextResponse.json({
       notifications,
@@ -68,7 +74,18 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { notificationId, read } = body
+    const { notificationId, read, markAllRead } = body
+
+    if (markAllRead === true) {
+      await prisma.notification.updateMany({
+        where: {
+          userId: user.userId,
+          read: false,
+        },
+        data: { read: true },
+      })
+      return NextResponse.json({ success: true })
+    }
 
     if (!notificationId || typeof read !== 'boolean') {
       return NextResponse.json(
