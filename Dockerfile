@@ -30,13 +30,15 @@ ENV PORT=3000
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
 COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
+COPY --from=builder /app/package.json /app/package-lock.json ./
 COPY --from=builder --chown=appuser:appgroup /app/prisma ./prisma
 COPY --from=builder --chown=appuser:appgroup /app/docker ./docker
 COPY --from=builder --chown=appuser:appgroup /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=appuser:appgroup /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=appuser:appgroup /app/node_modules/prisma ./node_modules/prisma
 
-RUN chmod +x /app/docker/entrypoint.sh \
+RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
+  && npm install --omit=dev --no-audit --no-fund prisma@6.19.0 \
+  && chmod +x /app/docker/entrypoint.sh \
   && mkdir -p /app/public/uploads/tasks
 
 EXPOSE 3000

@@ -11,9 +11,9 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-PRISMA_CMD="./node_modules/.bin/prisma"
-if [ ! -f "$PRISMA_CMD" ]; then
-  PRISMA_CMD="npx prisma@6"
+PRISMA_CMD="node /app/node_modules/prisma/build/index.js"
+if [ ! -f "/app/node_modules/prisma/build/index.js" ]; then
+  PRISMA_CMD="npx prisma"
 fi
 
 sleep 2
